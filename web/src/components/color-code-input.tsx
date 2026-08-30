@@ -14,14 +14,14 @@ export function ColorCodeInput({ name }: { name: string }) {
   return (
     <div className="space-y-3">
       <input type="hidden" name={name} value={value} />
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {COLORS.map((item) => (
           <button
             key={item.code}
             type="button"
-            disabled={value.length >= 8}
+            disabled={value.length >= 4}
             onClick={() => setValue((current) => current + item.code)}
-            className="h-14 rounded-xl text-xs font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 disabled:opacity-40"
+            className="h-16 rounded-xl text-xs font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 disabled:opacity-40"
             style={{ backgroundColor: item.color }}
             aria-label={`Add ${item.label}`}
           >

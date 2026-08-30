@@ -3,7 +3,7 @@ import { z } from "zod";
 import { authenticateDevice, unauthorized } from "@/lib/device-api";
 import { db, sha256 } from "@/lib/db";
 
-const schema = z.object({ code: z.string().regex(/^[ABCD]{4,8}$/) });
+const schema = z.object({ code: z.string().regex(/^[ABCD]{4}$/) });
 
 export async function POST(request: Request) {
   const device = authenticateDevice(request);

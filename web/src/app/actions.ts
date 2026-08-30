@@ -12,7 +12,7 @@ const employeeSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.string().trim().email().or(z.literal("")),
   role: z.string().trim().max(80),
-  code: z.string().regex(/^[ABCD]{4,8}$/),
+  code: z.string().regex(/^[ABCD]{4}$/),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
 });
 

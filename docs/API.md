@@ -20,7 +20,7 @@ on the server; the terminal submits a color sequence to the clock endpoint.
 
 ## `POST /api/device/v1/clock`
 
-Accepts `{ "code": "ABCD" }` (4–8 color keys using A, B, C, or D). The server
+Accepts `{ "code": "ABCD" }` (exactly four color keys using A, B, C, or D). The server
 validates the sequence and toggles that employee's current time entry. A
 successful response includes `employeeName`, `clockedIn`, and `occurredAt`.
 

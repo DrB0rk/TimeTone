@@ -96,7 +96,7 @@ export default function EmployeesPage() {
               />
               <Field label="Role" name="role" placeholder="Product designer" />
               <div className="space-y-2">
-                <Label>Color passcode (4–8 keys)</Label>
+                <Label>Color passcode (4 keys)</Label>
                 <ColorCodeInput name="code" />
                 <p className="text-xs text-black/40">Choose a sequence employees can remember. It is stored securely and never shown again.</p>
               </div>

@@ -50,7 +50,7 @@ If the saved Wi-Fi is unavailable for 20 seconds, the setup network returns.
 
 ## 4. Clock time
 
-Choose a 4–8 color sequence and tap **DONE**. The same action toggles between clock-in
+Choose exactly four colors; the terminal submits automatically after the fourth tap. The same action toggles between clock-in
 and clock-out. The event is stored before sync, so a short server or Wi-Fi
 outage does not lose it. The dashboard calculates rounded time per completed
 session while retaining exact timestamps.
