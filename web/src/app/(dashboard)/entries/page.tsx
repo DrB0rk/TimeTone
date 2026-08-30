@@ -1,6 +1,6 @@
 import { format } from "date-fns";
-import { Plus } from "lucide-react";
-import { addManualEntry } from "@/app/actions";
+import { Pencil, Plus } from "lucide-react";
+import { addManualEntry, updateTimeEntry } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { getEmployees, getEntries, getSettings } from "@/lib/db";
 export default function EntriesPage() {
   const entries = getEntries(),
     employees = getEmployees(false),
+    allEmployees = getEmployees(),
     settings = getSettings();
   return (
     <>
@@ -32,6 +33,7 @@ export default function EntriesPage() {
                   <th className="px-5 py-3">Exact</th>
                   <th className="px-5 py-3">Rounded</th>
                   <th className="px-5 py-3">Source</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/5">
@@ -70,14 +72,89 @@ export default function EntriesPage() {
                         )}
                       </td>
                       <td className="px-5 py-4 capitalize text-black/40">
-                        {entry.source}
+                        <span>{entry.source}</span>
+                        {entry.note && (
+                          <span className="mt-1 block max-w-40 truncate text-xs normal-case text-black/35" title={entry.note}>
+                            {entry.note}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <button
+                          type="button"
+                          popoverTarget={`edit-entry-${entry.id}`}
+                          popoverTargetAction="toggle"
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-black/10 px-2.5 text-xs font-medium text-black/60 transition-colors hover:bg-black/[.03]"
+                        >
+                          <Pencil className="size-3.5" />
+                          Edit
+                        </button>
+                        <div
+                          id={`edit-entry-${entry.id}`}
+                          popover="auto"
+                          className="fixed inset-0 m-auto w-[min(21rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-white p-4 text-left shadow-xl shadow-black/10"
+                        >
+                            <div className="mb-3">
+                              <p className="text-sm font-semibold">Edit time entry</p>
+                              <p className="mt-0.5 text-xs text-black/45">
+                                Adjust the raw times; reports will recalculate automatically.
+                              </p>
+                            </div>
+                            <form action={updateTimeEntry} className="space-y-3">
+                              <input type="hidden" name="id" value={entry.id} />
+                              <div className="space-y-1.5">
+                                <Label htmlFor={`employee-${entry.id}`}>Employee</Label>
+                                <select
+                                  id={`employee-${entry.id}`}
+                                  name="employee_id"
+                                  defaultValue={entry.employee_id}
+                                  className="h-9 w-full rounded-lg border border-black/10 bg-white px-2.5 text-sm"
+                                  required
+                                >
+                                  {allEmployees.map((employee) => (
+                                    <option key={employee.id} value={employee.id}>
+                                      {employee.name}{employee.active ? "" : " (inactive)"}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <DateField
+                                label="Clock in"
+                                name="clock_in"
+                                id={`clock-in-${entry.id}`}
+                                defaultValue={toDateTimeLocal(entry.clock_in)}
+                                required
+                                light
+                              />
+                              <DateField
+                                label="Clock out"
+                                name="clock_out"
+                                id={`clock-out-${entry.id}`}
+                                defaultValue={entry.clock_out ? toDateTimeLocal(entry.clock_out) : ""}
+                                light
+                              />
+                              <div className="space-y-1.5">
+                                <Label htmlFor={`note-${entry.id}`}>Note</Label>
+                                <Input
+                                  id={`note-${entry.id}`}
+                                  name="note"
+                                  defaultValue={entry.note || ""}
+                                  placeholder="Reason for correction"
+                                  className="h-9 border-black/10 bg-white"
+                                />
+                              </div>
+                              <Button type="submit" size="sm" className="w-full bg-[#17211b] text-white hover:bg-[#26352c]">
+                                Save changes
+                              </Button>
+                            </form>
+                        </div>
                       </td>
                     </tr>
                   );
                 })}
                 {entries.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-10 text-center text-black/40">
+                    <td colSpan={7} className="p-10 text-center text-black/40">
                       No entries recorded yet.
                     </td>
                   </tr>
@@ -135,22 +212,32 @@ export default function EntriesPage() {
   );
 }
 function DateField(
-  { label, name, required }: {
+  { label, name, id, required, defaultValue, light }: {
     label: string;
     name: string;
+    id?: string;
     required?: boolean;
+    defaultValue?: string;
+    light?: boolean;
   },
 ) {
   return (
     <div className="space-y-2">
-      <Label htmlFor={name}>{label}</Label>
+      <Label htmlFor={id || name}>{label}</Label>
       <Input
-        id={name}
+        id={id || name}
         name={name}
         type="datetime-local"
         required={required}
-        className="border-white/15 bg-white/8 scheme-dark"
+        defaultValue={defaultValue}
+        className={light
+          ? "h-9 border-black/10 bg-white"
+          : "border-white/15 bg-white/8 scheme-dark"}
       />
     </div>
   );
+}
+
+function toDateTimeLocal(value: string) {
+  return format(new Date(value), "yyyy-MM-dd'T'HH:mm");
 }

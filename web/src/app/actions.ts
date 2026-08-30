@@ -142,10 +142,11 @@ export async function changePassword(formData: FormData) {
 export async function addManualEntry(formData: FormData) {
   await requireAuth();
   const employeeId = z.string().min(1).parse(formData.get("employee_id"));
-  const clockIn = new Date(z.string().min(1).parse(formData.get("clock_in")))
-    .toISOString();
+  const clockIn = parseEntryDate(formData.get("clock_in"), "Clock-in");
   const clockOutValue = String(formData.get("clock_out") || "");
-  const clockOut = clockOutValue ? new Date(clockOutValue).toISOString() : null;
+  const clockOut = clockOutValue
+    ? parseEntryDate(clockOutValue, "Clock-out")
+    : null;
   const note = z.string().max(200).parse(String(formData.get("note") || ""));
   if (clockOut && new Date(clockOut) <= new Date(clockIn)) {
     throw new Error("Clock-out must be after clock-in");
@@ -163,4 +164,46 @@ export async function addManualEntry(formData: FormData) {
     );
   revalidatePath("/entries");
   revalidatePath("/");
+}
+
+export async function updateTimeEntry(formData: FormData) {
+  await requireAuth();
+  const id = z.string().min(1).parse(formData.get("id"));
+  const employeeId = z.string().min(1).parse(formData.get("employee_id"));
+  const clockIn = parseEntryDate(formData.get("clock_in"), "Clock-in");
+  const clockOutValue = String(formData.get("clock_out") || "");
+  const clockOut = clockOutValue
+    ? parseEntryDate(clockOutValue, "Clock-out")
+    : null;
+  const note = z.string().max(200).parse(String(formData.get("note") || ""));
+
+  if (!db.prepare("SELECT id FROM time_entries WHERE id = ?").get(id)) {
+    throw new Error("Time entry not found");
+  }
+  if (!db.prepare("SELECT id FROM employees WHERE id = ?").get(employeeId)) {
+    throw new Error("Employee not found");
+  }
+  if (clockOut && new Date(clockOut) <= new Date(clockIn)) {
+    throw new Error("Clock-out must be after clock-in");
+  }
+  const otherOpen = db.prepare(
+    "SELECT id FROM time_entries WHERE employee_id = ? AND clock_out IS NULL AND id != ?",
+  ).get(employeeId, id);
+  if (!clockOut && otherOpen) {
+    throw new Error("This employee already has an open time entry");
+  }
+
+  db.prepare(
+    "UPDATE time_entries SET employee_id = ?, clock_in = ?, clock_out = ?, note = ?, updated_at = ? WHERE id = ?",
+  ).run(employeeId, clockIn, clockOut, note || null, new Date().toISOString(), id);
+  revalidatePath("/entries");
+  revalidatePath("/");
+  revalidatePath("/reports");
+}
+
+function parseEntryDate(value: FormDataEntryValue | null, label: string) {
+  const raw = z.string().min(1).parse(value);
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) throw new Error(`${label} is not valid`);
+  return date.toISOString();
 }
