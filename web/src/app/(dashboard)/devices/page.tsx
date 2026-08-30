@@ -1,11 +1,9 @@
 import { formatDistanceToNow } from "date-fns";
-import { Cpu, Plus, Radio } from "lucide-react";
-import { createDevice } from "@/app/actions";
+import { Cpu, Plus } from "lucide-react";
+import { approveDevice, rejectDevice } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { getDevices } from "@/lib/db";
 
 export default function DevicesPage() {
@@ -34,11 +32,15 @@ export default function DevicesPage() {
                     <Cpu className="size-5" />
                   </span>
                   <Badge
-                    className={online
+                    className={device.approved === 0
+                      ? "bg-orange-100 text-orange-700"
+                      : online
                       ? "bg-emerald-100 text-emerald-700"
                       : "bg-amber-100 text-amber-700"}
                   >
-                    {online ? "Online" : "Offline"}
+                    {device.approved === 0
+                      ? "Awaiting approval"
+                      : online ? "Online" : "Offline"}
                   </Badge>
                 </div>
                 <h2 className="mt-5 font-semibold">{device.name}</h2>
@@ -75,6 +77,20 @@ export default function DevicesPage() {
                     </dd>
                   </div>
                 </dl>
+                {device.approved === 0 && (
+                  <div className="mt-5 flex gap-2 border-t border-black/6 pt-4">
+                    <form action={approveDevice} className="flex-1">
+                      <input type="hidden" name="id" value={device.id} />
+                      <Button type="submit" className="w-full bg-[#17211b] text-white hover:bg-[#26352c]">
+                        Approve device
+                      </Button>
+                    </form>
+                    <form action={rejectDevice}>
+                      <input type="hidden" name="id" value={device.id} />
+                      <Button type="submit" variant="outline">Reject</Button>
+                    </form>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -87,36 +103,18 @@ export default function DevicesPage() {
             <div>
               <h2 className="font-semibold">Register terminal</h2>
               <p className="text-xs text-white/40">
-                Use the same token during setup
+                Pair terminals from their setup page
               </p>
             </div>
           </div>
-          <form action={createDevice} className="mt-6 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Device name</Label>
-              <Input
-                id="name"
-                name="name"
-                placeholder="Kitchen entrance"
-                className="border-white/15 bg-white/8"
-                required
-              />
+          <div className="mt-6 space-y-3 text-sm text-white/65">
+            <p>1. Join the terminal’s <span className="font-medium text-white">ESP-Timekeep</span> setup Wi-Fi.</p>
+            <p>2. Enter this server URL in the setup page and save.</p>
+            <p>3. The new terminal appears here automatically for approval.</p>
+            <div className="rounded-xl bg-white/8 p-3 text-xs text-white/45">
+              No device token is required. Each terminal creates its own secure credential.
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="token">Device token</Label>
-              <Input
-                id="token"
-                name="token"
-                placeholder="At least 12 characters"
-                minLength={12}
-                className="border-white/15 bg-white/8"
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full bg-[#d8ff62] text-[#17211b] hover:bg-[#c9ef58]">
-              <Radio className="size-4" />Register
-            </Button>
-          </form>
+          </div>
         </div>
       </div>
     </>

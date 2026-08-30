@@ -43,7 +43,8 @@ db.exec(`
     firmware_version TEXT,
     ip_address TEXT,
     pending_events INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    approved INTEGER NOT NULL DEFAULT 1
   );
   CREATE TABLE IF NOT EXISTS device_events (
     id TEXT PRIMARY KEY,
@@ -66,6 +67,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_entries_employee_time ON time_entries(employee_id, clock_in);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_one_open_entry ON time_entries(employee_id) WHERE clock_out IS NULL;
 `);
+
+try {
+  db.exec("ALTER TABLE devices ADD COLUMN approved INTEGER NOT NULL DEFAULT 1");
+} catch {
+  // Existing databases already have the approval column.
+}
 
 const defaults = {
   company_name: "Studio North",
@@ -126,7 +133,7 @@ export function getDevices() {
 }
 
 export function findDeviceByToken(token: string) {
-  return db.prepare("SELECT * FROM devices WHERE token_digest = ?").get(
+  return db.prepare("SELECT * FROM devices WHERE token_digest = ? AND approved = 1").get(
     sha256(token),
   ) as Device | undefined;
 }
@@ -191,7 +198,7 @@ export function seedDevelopmentData() {
     now,
   );
   db.prepare(
-    "INSERT OR IGNORE INTO devices VALUES (?, ?, ?, NULL, NULL, NULL, 0, ?)",
+    "INSERT OR IGNORE INTO devices (id, name, token_digest, last_seen_at, firmware_version, ip_address, pending_events, created_at, approved) VALUES (?, ?, ?, NULL, NULL, NULL, 0, ?, 1)",
   ).run(
     "cyd-main",
     "Front desk",

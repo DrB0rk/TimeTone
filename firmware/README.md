@@ -3,7 +3,7 @@
 ESP-IDF 6 firmware for the ESP32-2432S032 CYD. It uses LVGL 9.3, the ST7789
 LCD driver, and the XPT2046 touch controller.
 
-The S032's 3.2in ST7789 is a 240x320 panel rotated to 320x240 landscape. Its
+The S032's 3.2in ST7789 is used in native 240x320 portrait mode. Its
 backlight is GPIO27 on the common run (GPIO21 on some production runs; the
 firmware drives both) and its XPT2046 shares the LCD SPI bus (CS33, IRQ36).
 

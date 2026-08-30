@@ -70,12 +70,18 @@ export async function toggleEmployee(formData: FormData) {
   revalidatePath("/employees");
 }
 
-export async function createDevice(formData: FormData) {
+export async function approveDevice(formData: FormData) {
   await requireAuth();
-  const name = z.string().trim().min(2).max(80).parse(formData.get("name"));
-  const token = z.string().trim().min(12).max(128).parse(formData.get("token"));
-  db.prepare("INSERT INTO devices VALUES (?, ?, ?, NULL, NULL, NULL, 0, ?)")
-    .run(crypto.randomUUID(), name, sha256(token), new Date().toISOString());
+  const id = z.string().min(1).parse(formData.get("id"));
+  db.prepare("UPDATE devices SET approved = 1 WHERE id = ?").run(id);
+  revalidatePath("/devices");
+  revalidatePath("/");
+}
+
+export async function rejectDevice(formData: FormData) {
+  await requireAuth();
+  const id = z.string().min(1).parse(formData.get("id"));
+  db.prepare("DELETE FROM devices WHERE id = ? AND approved = 0").run(id);
   revalidatePath("/devices");
 }
 

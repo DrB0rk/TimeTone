@@ -10,6 +10,7 @@
 #include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_netif_sntp.h"
+#include "esp_random.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
@@ -31,9 +32,9 @@ static const char SETUP_HTML[] =
 "p{color:#657068;line-height:1.5}label{display:block;margin:18px 0 6px;font-size:13px;font-weight:650}input{box-sizing:border-box;width:100%;padding:13px;border:1px solid #d4d8d1;border-radius:10px;font-size:16px}"
 "button{width:100%;margin-top:24px;padding:14px;border:0;border-radius:11px;background:#d8ff62;color:#17211b;font-weight:750;font-size:16px}</style></head>"
 "<body><main><div style='font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#657068'>Terminal setup</div><h1>ESP Timekeep</h1>"
-"<p>Connect this terminal to Wi-Fi and your hosted Timekeep server.</p><form method=post action=/save>"
+"<p>Connect this terminal to Wi-Fi and enter the Timekeep server URL. The server will show this terminal for approval automatically.</p><form method=post action=/save>"
 "<label>Wi-Fi name</label><input name=ssid maxlength=32 required><label>Wi-Fi password</label><input name=password type=password maxlength=64>"
-"<label>Server URL</label><input name=server placeholder='https://time.example.com' required><label>Device token</label><input name=token type=password minlength=12 required>"
+"<label>Server URL</label><input name=server placeholder='http://192.168.1.20:3000' required>"
 "<button>Save and restart</button></form></main></body></html>";
 
 static esp_err_t root_handler(httpd_req_t *request)
@@ -82,10 +83,17 @@ static esp_err_t save_handler(httpd_req_t *request)
     form_value(body, "ssid", config.ssid, sizeof(config.ssid));
     form_value(body, "password", config.wifi_password, sizeof(config.wifi_password));
     form_value(body, "server", config.server_url, sizeof(config.server_url));
-    form_value(body, "token", config.device_token, sizeof(config.device_token));
+    // Generate the device credential locally; it is never typed or exposed
+    // during setup. The server receives it through the pairing handshake.
+    if (tk_config_get()->device_token[0]) {
+        strlcpy(config.device_token, tk_config_get()->device_token, sizeof(config.device_token));
+    } else {
+        uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA);
+        snprintf(config.device_token, sizeof(config.device_token), "tk-%02X%02X%02X%02X-%08lX", mac[2], mac[3], mac[4], mac[5], (unsigned long)esp_random());
+    }
     strlcpy(config.timezone, "Europe/Amsterdam", sizeof(config.timezone));
     free(body);
-    if (!config.ssid[0] || !config.server_url[0] || !config.device_token[0]) return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, "Missing required value");
+    if (!config.ssid[0] || !config.server_url[0]) return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, "Missing required value");
     while (strlen(config.server_url) && config.server_url[strlen(config.server_url) - 1] == '/') config.server_url[strlen(config.server_url) - 1] = 0;
     ESP_ERROR_CHECK(tk_config_save(&config));
     httpd_resp_set_type(request, "text/html");

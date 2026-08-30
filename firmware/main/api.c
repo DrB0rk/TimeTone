@@ -137,7 +137,14 @@ static void heartbeat(void)
     char body[220];
     snprintf(body, sizeof(body), "{\"firmwareVersion\":\"%s\",\"ipAddress\":\"%s\",\"pendingEvents\":%d}", TK_FIRMWARE_VERSION, ip, pending);
     char response[256];
-    request("/api/device/v1/heartbeat", HTTP_METHOD_POST, body, response, sizeof(response));
+    int status = request("/api/device/v1/heartbeat", HTTP_METHOD_POST, body, response, sizeof(response));
+    if (status == 401) {
+        char pair_body[320];
+        snprintf(pair_body, sizeof(pair_body), "{\"deviceName\":\"%s\",\"token\":\"%s\",\"firmwareVersion\":\"%s\",\"ipAddress\":\"%s\"}", tk_network_setup_ssid(), tk_config_get()->device_token, TK_FIRMWARE_VERSION, ip);
+        int pair_status = request("/api/device/v1/pair", HTTP_METHOD_POST, pair_body, response, sizeof(response));
+        if (pair_status == 202) ESP_LOGW(TAG, "device pairing requested; approve it in the server dashboard");
+        else if (pair_status == 200) ESP_LOGI(TAG, "device pairing already approved");
+    }
 }
 
 static void api_task(void *argument)

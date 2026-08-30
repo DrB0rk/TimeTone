@@ -28,8 +28,9 @@ idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
 On a factory-fresh terminal, join the `ESP-Timekeep-XXXX` Wi-Fi network with
-password `timekeep`, open `http://192.168.4.1`, and enter Wi-Fi, server URL, and
-the device token. The local demo dashboard password is `timekeep`; employee
+password `timekeep`, open `http://192.168.4.1`, and enter Wi-Fi plus the server
+URL. The terminal creates its own credential and appears in the dashboard for
+approval. The local demo dashboard password is `timekeep`; employee
 Alex Morgan uses PIN `1234`. Change every demo credential before deployment.
 
 See [Getting started](docs/GETTING_STARTED.md), [hardware](docs/HARDWARE.md),
@@ -45,4 +46,3 @@ See [Getting started](docs/GETTING_STARTED.md), [hardware](docs/HARDWARE.md),
 - Exact and independently rounded totals, configurable policy, CSV export
 - SQLite WAL storage, Docker deployment, persistent volumes, and health checks
 - Dual OTA-ready application partitions and semver firmware reporting
-

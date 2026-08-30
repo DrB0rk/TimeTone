@@ -29,6 +29,7 @@ export type Device = {
   ip_address: string | null;
   pending_events: number;
   created_at: string;
+  approved: number;
 };
 
 export type AppSettings = {

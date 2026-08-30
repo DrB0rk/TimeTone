@@ -35,12 +35,14 @@ static const char *TAG = "display";
 #define PIN_LCD_BL_ALT 21
 #define PIN_TOUCH_CS 33
 #define PIN_TOUCH_IRQ 36
-#define H_RES 320
-#define V_RES 240
+#define H_RES 240
+#define V_RES 320
 
 static _lock_t s_lvgl_lock;
 static lv_display_t *s_display;
+static lv_obj_t *s_main_screen, *s_setup_screen;
 static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_count_label;
+static lv_obj_t *s_setup_details;
 static char s_pin[9];
 static bool s_online;
 
@@ -94,11 +96,8 @@ static void update_pin_label(void)
     lv_obj_set_style_text_color(s_pin_label, lv_color_hex(hidden[0] ? 0x17211B : 0x788078), 0);
 }
 
-static void keypad_event(lv_event_t *event)
+static void handle_keypress(const char *text)
 {
-    lv_obj_t *matrix = lv_event_get_target_obj(event);
-    uint32_t selected = lv_buttonmatrix_get_selected_button(matrix);
-    const char *text = lv_buttonmatrix_get_button_text(matrix, selected);
     if (!text) return;
     if (strcmp(text, "<") == 0) {
         size_t length = strlen(s_pin); if (length) s_pin[length - 1] = 0;
@@ -122,6 +121,11 @@ static void keypad_event(lv_event_t *event)
     update_pin_label();
 }
 
+static void keypad_button_event(lv_event_t *event)
+{
+    handle_keypress((const char *)lv_event_get_user_data(event));
+}
+
 static void clock_timer(lv_timer_t *timer)
 {
     time_t now; struct tm local;
@@ -134,26 +138,39 @@ static void clock_timer(lv_timer_t *timer)
 
 static void build_clock_ui(void)
 {
-    lv_obj_t *screen = lv_screen_active();
-    lv_obj_set_style_bg_color(screen, lv_color_hex(0xF5F6F2), 0);
-    lv_obj_set_style_pad_all(screen, 0, 0);
-    lv_obj_t *header = lv_obj_create(screen);
-    lv_obj_remove_style_all(header); lv_obj_set_size(header, H_RES, 50); lv_obj_set_style_bg_color(header, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(header, LV_OPA_COVER, 0);
+    s_main_screen = lv_obj_create(lv_screen_active());
+    lv_obj_remove_style_all(s_main_screen); lv_obj_set_size(s_main_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_main_screen, lv_color_hex(0xF5F6F2), 0); lv_obj_set_style_bg_opa(s_main_screen, LV_OPA_COVER, 0);
+    lv_obj_t *header = lv_obj_create(s_main_screen);
+    lv_obj_remove_style_all(header); lv_obj_set_size(header, H_RES, 46); lv_obj_set_style_bg_color(header, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(header, LV_OPA_COVER, 0);
     lv_obj_t *brand = lv_label_create(header); lv_label_set_text(brand, "ESP TIMEKEEP"); lv_obj_set_style_text_color(brand, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(brand, &lv_font_montserrat_14, 0); lv_obj_align(brand, LV_ALIGN_LEFT_MID, 14, 0);
     s_clock_label = lv_label_create(header); lv_obj_set_style_text_color(s_clock_label, lv_color_white(), 0); lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0); lv_obj_align(s_clock_label, LV_ALIGN_RIGHT_MID, -14, 0);
-    lv_obj_t *left = lv_obj_create(screen); lv_obj_remove_style_all(left); lv_obj_set_pos(left, 0, 50); lv_obj_set_size(left, 130, 190); lv_obj_set_style_pad_all(left, 14, 0);
-    lv_obj_t *prompt = lv_label_create(left); lv_label_set_text(prompt, "Clock in\nor out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(0x17211B), 0); lv_obj_align(prompt, LV_ALIGN_TOP_LEFT, 0, 2);
-    s_pin_label = lv_label_create(left); lv_obj_set_width(s_pin_label, 102); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_align(s_pin_label, LV_ALIGN_TOP_LEFT, 0, 70);
-    s_status_label = lv_label_create(left); lv_obj_set_width(s_status_label, 105); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_WRAP); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_align(s_status_label, LV_ALIGN_TOP_LEFT, 0, 108);
-    s_count_label = lv_label_create(left); lv_obj_set_style_text_color(s_count_label, lv_color_hex(0x788078), 0); lv_obj_set_style_text_font(s_count_label, &lv_font_montserrat_14, 0); lv_obj_align(s_count_label, LV_ALIGN_BOTTOM_LEFT, 0, 0);
-    s_keypad = lv_buttonmatrix_create(screen);
-    static const char *map[] = { "1", "2", "3", "\n", "4", "5", "6", "\n", "7", "8", "9", "\n", "<", "0", "OK", "" };
-    lv_buttonmatrix_set_map(s_keypad, map); lv_obj_set_pos(s_keypad, 130, 50); lv_obj_set_size(s_keypad, 190, 190);
-    lv_obj_set_style_bg_color(s_keypad, lv_color_hex(0xE8EAE5), 0); lv_obj_set_style_border_width(s_keypad, 0, 0); lv_obj_set_style_pad_all(s_keypad, 5, 0); lv_obj_set_style_pad_gap(s_keypad, 4, 0);
-    lv_obj_set_style_bg_color(s_keypad, lv_color_white(), LV_PART_ITEMS); lv_obj_set_style_text_color(s_keypad, lv_color_hex(0x17211B), LV_PART_ITEMS); lv_obj_set_style_text_font(s_keypad, &lv_font_montserrat_14, LV_PART_ITEMS); lv_obj_set_style_radius(s_keypad, 8, LV_PART_ITEMS); lv_obj_set_style_border_width(s_keypad, 0, LV_PART_ITEMS);
-    lv_obj_add_event_cb(s_keypad, keypad_event, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_t *prompt = lv_label_create(s_main_screen); lv_label_set_text(prompt, "Clock in or out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(0x17211B), 0); lv_obj_set_pos(prompt, 14, 55);
+    s_pin_label = lv_label_create(s_main_screen); lv_obj_set_size(s_pin_label, 212, 38); lv_obj_set_style_bg_color(s_pin_label, lv_color_white(), 0); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_COVER, 0); lv_obj_set_style_border_width(s_pin_label, 1, 0); lv_obj_set_style_border_color(s_pin_label, lv_color_hex(0xD4D8D1), 0); lv_obj_set_style_radius(s_pin_label, 10, 0); lv_obj_set_style_pad_left(s_pin_label, 12, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 14, 78);
+    s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 30); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_WRAP); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 120);
+    s_keypad = lv_obj_create(s_main_screen); lv_obj_remove_style_all(s_keypad); lv_obj_set_size(s_keypad, 212, 144); lv_obj_set_pos(s_keypad, 14, 157);
+    static const char *keys[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "<", "0", "OK" };
+    for (int i = 0; i < 12; ++i) {
+        lv_obj_t *button = lv_button_create(s_keypad);
+        lv_obj_set_size(button, 64, 30); lv_obj_set_pos(button, (i % 3) * 74, (i / 3) * 37);
+        lv_obj_set_style_bg_color(button, lv_color_white(), 0); lv_obj_set_style_bg_color(button, lv_color_hex(0xD8FF62), LV_STATE_PRESSED); lv_obj_set_style_text_color(button, lv_color_hex(0x17211B), 0); lv_obj_set_style_text_font(button, &lv_font_montserrat_14, 0); lv_obj_set_style_radius(button, 9, 0); lv_obj_set_style_border_width(button, 1, 0); lv_obj_set_style_border_color(button, lv_color_hex(0xC8CEC7), 0); lv_obj_set_style_shadow_width(button, 3, 0); lv_obj_set_style_shadow_opa(button, LV_OPA_20, 0); lv_obj_add_event_cb(button, keypad_button_event, LV_EVENT_CLICKED, (void *)keys[i]);
+        lv_obj_t *label = lv_label_create(button); lv_label_set_text(label, keys[i]); lv_obj_center(label);
+    }
+    s_count_label = lv_label_create(s_main_screen); lv_obj_set_style_text_color(s_count_label, lv_color_hex(0x788078), 0); lv_obj_set_style_text_font(s_count_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_count_label, 14, 304);
     set_status("Ready", 0x168455); update_pin_label();
     lv_timer_create(clock_timer, 1000, NULL); clock_timer(NULL);
+}
+
+static void build_setup_ui(void)
+{
+    s_setup_screen = lv_obj_create(lv_screen_active());
+    lv_obj_remove_style_all(s_setup_screen); lv_obj_set_size(s_setup_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_setup_screen, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_setup_screen, LV_OPA_COVER, 0); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_t *eyebrow = lv_label_create(s_setup_screen); lv_label_set_text(eyebrow, "ESP TIMEKEEP  •  OFFLINE"); lv_obj_set_style_text_color(eyebrow, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(eyebrow, &lv_font_montserrat_14, 0); lv_obj_set_pos(eyebrow, 18, 24);
+    lv_obj_t *title = lv_label_create(s_setup_screen); lv_label_set_text(title, "NO NETWORK"); lv_obj_set_style_text_color(title, lv_color_white(), 0); lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0); lv_obj_set_pos(title, 18, 58);
+    lv_obj_t *message = lv_label_create(s_setup_screen); lv_label_set_text(message, "Connect to this access point\nto configure the terminal."); lv_obj_set_style_text_color(message, lv_color_hex(0xC8D0C9), 0); lv_obj_set_style_text_font(message, &lv_font_montserrat_14, 0); lv_obj_set_pos(message, 18, 100);
+    lv_obj_t *card = lv_obj_create(s_setup_screen); lv_obj_remove_style_all(card); lv_obj_set_size(card, 204, 122); lv_obj_set_pos(card, 18, 158); lv_obj_set_style_bg_color(card, lv_color_hex(0x26352C), 0); lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0); lv_obj_set_style_radius(card, 12, 0); lv_obj_set_style_pad_all(card, 14, 0);
+    lv_obj_t *details = lv_label_create(card); lv_label_set_text(details, "SETUP WI-FI"); lv_obj_set_style_text_color(details, lv_color_hex(0xA9B6A9), 0); lv_obj_set_style_text_font(details, &lv_font_montserrat_14, 0); lv_obj_set_pos(details, 14, 12);
+    s_setup_details = lv_label_create(card); lv_obj_set_style_text_color(s_setup_details, lv_color_white(), 0); lv_obj_set_style_text_font(s_setup_details, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_setup_details, 14, 38);
+    lv_obj_t *hint = lv_label_create(s_setup_screen); lv_label_set_text(hint, "Open 192.168.4.1 in your browser"); lv_obj_set_style_text_color(hint, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0); lv_obj_set_pos(hint, 18, 300);
 }
 
 esp_err_t tk_display_init(void)
@@ -169,9 +186,9 @@ esp_err_t tk_display_init(void)
     esp_lcd_panel_handle_t panel;
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io, &panel_config, &panel));
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel)); ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
-    // The S032 uses a 3.2in ST7789 IPS panel: native 240x320, rotated into
-    // 320x240 landscape. ST7789 panels on this board require inversion.
-    ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel, true)); ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel, true)); ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel, true, false)); ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
+    // The S032 uses a native 240x320 ST7789 portrait panel. Clear MV/MX/MY
+    // for the requested 90-degree counter-clockwise portrait orientation.
+    ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel, true)); ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel, false)); ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel, false, false)); ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
     lv_init();
     s_display = lv_display_create(H_RES, V_RES);
     size_t buffer_size = H_RES * 30 * sizeof(lv_color16_t);
@@ -185,12 +202,12 @@ esp_err_t tk_display_init(void)
     // write-only, but GPIO12 remains on the bus as touch MISO.
     esp_lcd_panel_io_spi_config_t touch_io_config = ESP_LCD_TOUCH_IO_SPI_XPT2046_CONFIG(PIN_TOUCH_CS);
     esp_lcd_panel_io_handle_t touch_io; ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &touch_io_config, &touch_io));
-    esp_lcd_touch_config_t touch_config = { .x_max = H_RES, .y_max = V_RES, .rst_gpio_num = -1, .int_gpio_num = PIN_TOUCH_IRQ, .flags = { .swap_xy = 1, .mirror_x = 0, .mirror_y = 0 } };
+    esp_lcd_touch_config_t touch_config = { .x_max = H_RES, .y_max = V_RES, .rst_gpio_num = -1, .int_gpio_num = PIN_TOUCH_IRQ, .flags = { .swap_xy = 0, .mirror_x = 0, .mirror_y = 0 } };
     esp_lcd_touch_handle_t touch; ESP_ERROR_CHECK(esp_lcd_touch_new_spi_xpt2046(touch_io, &touch_config, &touch));
     lv_indev_t *indev = lv_indev_create(); lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); lv_indev_set_display(indev, s_display); lv_indev_set_user_data(indev, touch); lv_indev_set_read_cb(indev, touch_cb);
     const esp_timer_create_args_t tick_args = { .callback = tick_cb, .name = "lvgl_tick" };
     esp_timer_handle_t timer; ESP_ERROR_CHECK(esp_timer_create(&tick_args, &timer)); ESP_ERROR_CHECK(esp_timer_start_periodic(timer, 2000));
-    build_clock_ui(); tk_display_refresh();
+    build_clock_ui(); build_setup_ui(); tk_display_refresh();
     xTaskCreate(lvgl_task, "lvgl", 6144, NULL, 5, NULL);
     gpio_set_level(PIN_LCD_BL, 1); gpio_set_level(PIN_LCD_BL_ALT, 1);
     ESP_LOGI(TAG, "display initialized");
@@ -199,9 +216,17 @@ esp_err_t tk_display_init(void)
 
 void tk_display_set_online(bool online)
 {
-    if (!s_status_label || online == s_online) return;
+    if (!s_status_label || !s_setup_screen) return;
     s_online = online; _lock_acquire(&s_lvgl_lock);
-    if (online) set_status("Online · synced", 0x168455); else set_status("Offline · events will queue", 0xC47B24);
+    if (online) {
+        lv_obj_clear_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);
+        set_status("Online · synced", 0x168455);
+    } else {
+        char details[96]; snprintf(details, sizeof(details), "%s\nPassword: timekeep", tk_network_setup_ssid());
+        lv_label_set_text(s_setup_details, details);
+        lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);
+        set_status("Offline · events will queue", 0xC47B24);
+    }
     _lock_release(&s_lvgl_lock);
 }
 
@@ -215,7 +240,10 @@ void tk_display_refresh(void)
 
 void tk_display_show_setup(void)
 {
-    if (!s_status_label) return;
-    char text[120]; snprintf(text, sizeof(text), "Setup: %s\nPassword: timekeep\nOpen 192.168.4.1", tk_network_setup_ssid());
-    _lock_acquire(&s_lvgl_lock); set_status(text, 0xC47B24); lv_obj_add_flag(s_keypad, LV_OBJ_FLAG_HIDDEN); _lock_release(&s_lvgl_lock);
+    if (!s_setup_screen) return;
+    _lock_acquire(&s_lvgl_lock);
+    char details[96]; snprintf(details, sizeof(details), "%s\nPassword: timekeep", tk_network_setup_ssid());
+    lv_label_set_text(s_setup_details, details);
+    lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);
+    _lock_release(&s_lvgl_lock);
 }

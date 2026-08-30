@@ -5,7 +5,7 @@ The default target is the **ESP32-2432S032** Cheap Yellow Display v2 with a
 uses the touchscreen; no external keypad is required.
 
 The ST7789 controller is conventionally documented as 240×320 native; the
-firmware swaps XY for the 320×240 landscape UI and enables panel inversion.
+firmware uses that native portrait orientation and enables panel inversion.
 
 | Function | GPIO |
 |---|---:|
