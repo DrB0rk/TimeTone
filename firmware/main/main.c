@@ -32,5 +32,5 @@ void app_main(void)
     ESP_ERROR_CHECK(tk_api_start());
     if (!tk_config_get()->configured) tk_display_show_setup();
     else xTaskCreate(fallback_task, "wifi_fallback", 3072, NULL, 2, NULL);
-    ESP_LOGI(TAG, "ESP Timekeep %s ready", TK_FIRMWARE_VERSION);
+    ESP_LOGI(TAG, "TimeTone %s ready", TK_FIRMWARE_VERSION);
 }

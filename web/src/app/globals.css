@@ -148,6 +148,7 @@ html.dark .bg-orange-100 { background-color: #ffc49b !important; color: #652700 
 html.dark .bg-slate-100 { background-color: #d8e0dc !important; color: #17211b !important; }
 html.dark .bg-emerald-100.text-emerald-700, html.dark .bg-amber-100.text-amber-700, html.dark .bg-orange-100.text-orange-700, html.dark .bg-slate-100.text-slate-700 { filter: saturate(.9); }
 html.dark .stat-card-accent > p, html.dark .stat-card-accent > div > p { color: #17211b !important; }
+html.dark .employee-add-card [data-slot="card-title"], html.dark .employee-add-card label { color: #edf5ee; }
 
 @keyframes rise-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes presence-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgb(216 255 98 / .34); } 50% { box-shadow: 0 0 0 8px rgb(216 255 98 / 0); } }

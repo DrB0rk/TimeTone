@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { LiveDashboardRefresh } from "@/components/live-dashboard-refresh";
 import { requireAuth } from "@/lib/auth";
 import { getSettings } from "@/lib/db";
 
@@ -7,6 +8,9 @@ export default async function DashboardLayout(
 ) {
   await requireAuth();
   return (
-    <AppShell companyName={getSettings().company_name}>{children}</AppShell>
+    <AppShell companyName={getSettings().company_name}>
+      <LiveDashboardRefresh />
+      {children}
+    </AppShell>
   );
 }

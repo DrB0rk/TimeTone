@@ -10,8 +10,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "ESP Timekeep", template: "%s · ESP Timekeep" },
+  title: { default: "TimeTone", template: "%s · TimeTone" },
   description: "Office time tracking for the ESP32 Cheap Yellow Display",
+  icons: { icon: "/timetone-mark.svg" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

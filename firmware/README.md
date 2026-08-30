@@ -1,4 +1,4 @@
-# ESP Timekeep firmware
+# TimeTone firmware
 
 ESP-IDF 6 firmware for the ESP32-2432S032 CYD. It uses LVGL 9.3, the ST7789
 LCD driver, and the XPT2046 touch controller.

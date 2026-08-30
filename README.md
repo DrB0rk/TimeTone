@@ -1,6 +1,6 @@
-# ESP Timekeep
+# TimeTone
 
-ESP Timekeep is an offline-first office time clock for the ESP32-2432S028R
+TimeTone is an offline-first office time clock for the ESP32-2432S028R
 "Cheap Yellow Display" (CYD). Employees clock in and out with a personal code
 on the touchscreen. A companion web application manages employees and devices,
 shows live attendance, and reports rounded working time.
@@ -27,7 +27,7 @@ idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
-On a factory-fresh terminal, join the `ESP-Timekeep-XXXX` Wi-Fi network with
+On a factory-fresh terminal, join the `TimeTone-XXXX` Wi-Fi network with
 password `timekeep`, open `http://192.168.4.1`, and enter Wi-Fi plus the server
 URL. The terminal creates its own credential and appears in the dashboard for
 approval. The local demo dashboard password is `timekeep`; employee

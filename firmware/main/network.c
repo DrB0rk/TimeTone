@@ -28,11 +28,11 @@ static httpd_handle_t s_server;
 
 static const char SETUP_HTML[] =
 "<!doctype html><html><head><meta name=viewport content='width=device-width,initial-scale=1'>"
-"<title>ESP Timekeep setup</title><style>body{margin:0;background:#17211b;color:#17211b;font:16px system-ui}"
+"<title>TimeTone setup</title><style>body{margin:0;background:#17211b;color:#17211b;font:16px system-ui}"
 "main{max-width:460px;margin:7vh auto;background:#f5f6f2;padding:32px;border-radius:24px}h1{margin:0 0 8px;font-size:30px}"
 "p{color:#657068;line-height:1.5}label{display:block;margin:18px 0 6px;font-size:13px;font-weight:650}input{box-sizing:border-box;width:100%;padding:13px;border:1px solid #d4d8d1;border-radius:10px;font-size:16px}"
 "button{width:100%;margin-top:24px;padding:14px;border:0;border-radius:11px;background:#d8ff62;color:#17211b;font-weight:750;font-size:16px}</style></head>"
-"<body><main><div style='font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#657068'>Terminal setup</div><h1>ESP Timekeep</h1>"
+"<body><main><div style='font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#657068'>Terminal setup</div><h1>TimeTone</h1>"
 "<p>Connect this terminal to Wi-Fi and enter the Timekeep server URL. The server will show this terminal for approval automatically.</p><form method=post action=/save>"
 "<label>Wi-Fi name</label><input name=ssid maxlength=32 required><label>Wi-Fi password</label><input name=password type=password maxlength=64>"
 "<label>Server URL</label><input name=server placeholder='http://192.168.1.20:3000' required>"
@@ -170,7 +170,7 @@ esp_err_t tk_network_init(void)
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, event_handler, NULL));
     uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    snprintf(s_ap_ssid, sizeof(s_ap_ssid), "ESP-Timekeep-%02X%02X", mac[4], mac[5]);
+    snprintf(s_ap_ssid, sizeof(s_ap_ssid), "TimeTone-%02X%02X", mac[4], mac[5]);
     const tk_config_t *stored = tk_config_get();
     if (stored->configured) {
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));

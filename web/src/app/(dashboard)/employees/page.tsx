@@ -87,7 +87,7 @@ export default function EmployeesPage() {
             ))}
           </div>
         </div>
-        <Card className="h-fit border-black/6 shadow-none">
+        <Card className="employee-add-card h-fit border-black/6 bg-white shadow-none dark:border-white/10 dark:bg-[#1b261f]">
           <CardHeader>
             <div className="mb-2 grid size-10 place-items-center rounded-xl bg-[#d8ff62]">
               <UserPlus className="size-5" />
@@ -124,7 +124,7 @@ export default function EmployeesPage() {
                   className="h-10 bg-white p-1"
                 />
               </div>
-              <Button type="submit" className="w-full bg-[#17211b]">Create employee</Button>
+              <Button type="submit" className="w-full bg-[#17211b] text-white dark:!text-white">Create employee</Button>
             </form>
           </CardContent>
         </Card>

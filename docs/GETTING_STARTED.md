@@ -38,7 +38,7 @@ group depending on the distribution.
 ## 3. Provision it
 
 After first boot the display shows the setup SSID. Join
-`ESP-Timekeep-XXXX` using password `timekeep`, then browse to
+`TimeTone-XXXX` using password `timekeep`, then browse to
 `http://192.168.4.1`. Enter:
 
 - the office 2.4 GHz Wi-Fi network;

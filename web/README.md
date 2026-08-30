@@ -1,4 +1,4 @@
-# ESP Timekeep web application
+# TimeTone web application
 
 Next.js 16 application providing the admin dashboard and ESP device API.
 

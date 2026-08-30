@@ -1,7 +1,7 @@
 export function GET() {
   return Response.json({
     status: "ok",
-    service: "esp-timekeep",
+    service: "timetone",
     time: new Date().toISOString(),
   });
 }

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-label="TimeTone">
+  <rect width="64" height="64" rx="18" fill="#17211B"/>
+  <circle cx="29" cy="32" r="15" stroke="#D8FF62" stroke-width="4"/>
+  <path d="M29 23v10l7 4" stroke="#D8FF62" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M48 23c3 5 3 13 0 18" stroke="#F4F7F2" stroke-width="3" stroke-linecap="round" opacity=".86"/>
+  <path d="M54 19c5 8 5 19 0 27" stroke="#F4F7F2" stroke-width="3" stroke-linecap="round" opacity=".42"/>
+</svg>

@@ -7,6 +7,7 @@ import {
   runTimeMaintenance,
   sha256,
 } from "@/lib/db";
+import { publishLiveUpdate } from "@/lib/live-updates";
 
 const schema = z.object({ code: z.string().regex(/^[ABCD]{4}$/) });
 
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
     now,
   );
   db.prepare("UPDATE devices SET last_seen_at = ? WHERE id = ?").run(now, device.id);
+  publishLiveUpdate("clock");
   return Response.json({
     ok: true,
     employeeName: employee.name,

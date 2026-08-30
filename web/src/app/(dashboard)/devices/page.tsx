@@ -141,7 +141,7 @@ export default function DevicesPage() {
             </div>
           </div>
           <div className="mt-6 space-y-3 text-sm text-white/65">
-            <p>1. Join the terminal’s <span className="font-medium text-white">ESP-Timekeep</span> setup Wi-Fi.</p>
+            <p>1. Join the terminal’s <span className="font-medium text-white">TimeTone</span> setup Wi-Fi.</p>
             <p>2. Enter this server URL in the setup page and save.</p>
             <p>3. The new terminal appears here automatically for approval.</p>
             <div className="rounded-xl bg-white/8 p-3 text-xs text-white/45">

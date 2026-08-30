@@ -1,4 +1,5 @@
-import { Clock3, ShieldCheck, WifiOff } from "lucide-react";
+import { ShieldCheck, WifiOff } from "lucide-react";
+import Image from "next/image";
 import { login } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +15,7 @@ export default async function LoginPage(
         <div className="absolute -right-32 top-20 size-[30rem] rounded-full border border-[#d8ff62]/20" />
         <div className="absolute -right-16 top-36 size-[20rem] rounded-full border border-[#d8ff62]/30" />
         <div className="flex items-center gap-3 font-semibold">
-          <span className="grid size-10 place-items-center rounded-xl bg-[#d8ff62] text-[#17211b]">
-            <Clock3 className="size-5" />
-          </span>ESP Timekeep
+          <Image src="/timetone-mark.svg" alt="TimeTone" width={40} height={40} className="size-10" priority />TimeTone
         </div>
         <div className="relative max-w-xl">
           <p className="mb-5 text-sm font-semibold uppercase tracking-[.2em] text-[#d8ff62]">
@@ -42,9 +41,7 @@ export default async function LoginPage(
       <section className="flex items-center justify-center bg-[#f5f6f2] p-6">
         <div className="w-full max-w-sm">
           <div className="mb-10 lg:hidden">
-            <span className="grid size-12 place-items-center rounded-xl bg-[#17211b] text-[#d8ff62]">
-              <Clock3 />
-            </span>
+            <Image src="/timetone-mark.svg" alt="TimeTone" width={48} height={48} className="size-12" priority />
           </div>
           <p className="text-xs font-semibold uppercase tracking-[.18em] text-black/45">
             Administration
@@ -77,7 +74,7 @@ export default async function LoginPage(
             </Button>
           </form>
           <p className="mt-6 text-xs leading-5 text-black/35">
-            Use the administrator password configured for this Timekeep server.
+            Use the administrator password configured for this TimeTone server.
           </p>
         </div>
       </section>

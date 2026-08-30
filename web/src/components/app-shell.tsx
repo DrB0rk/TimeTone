@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
@@ -43,11 +44,9 @@ export function AppShell(
     <div className="min-h-screen bg-[#f5f6f2] text-[#17211b] transition-colors duration-500 dark:bg-[#101712] dark:text-[#edf5ee]">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col bg-[#17211b] text-white lg:flex">
         <div className="flex h-20 items-center gap-3 border-b border-white/10 px-6">
-          <div className="grid size-10 place-items-center rounded-xl bg-[#d8ff62] text-[#17211b]">
-            <Clock3 className="size-5" />
-          </div>
+          <Image src="/timetone-mark.svg" alt="TimeTone" width={40} height={40} className="size-10" priority />
           <div>
-            <p className="font-semibold tracking-tight">ESP Timekeep</p>
+            <p className="font-semibold tracking-tight">TimeTone</p>
             <p className="text-xs text-white/50">{companyName}</p>
           </div>
         </div>
@@ -83,9 +82,7 @@ export function AppShell(
             href="/"
             className="flex items-center gap-2 font-semibold lg:hidden"
           >
-            <span className="grid size-8 place-items-center rounded-lg bg-[#17211b] text-[#d8ff62]">
-              <Clock3 className="size-4" />
-            </span>Timekeep
+            <Image src="/timetone-mark.svg" alt="" width={32} height={32} className="size-8" priority />TimeTone
           </Link>
           <nav className="ml-auto flex max-w-full gap-1 overflow-auto lg:hidden">
             {navigation.slice(0, 4).map((item) => (

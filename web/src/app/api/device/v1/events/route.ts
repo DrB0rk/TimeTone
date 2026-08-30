@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { authenticateDevice, unauthorized } from "@/lib/device-api";
 import { db, ingestDeviceEvent } from "@/lib/db";
+import { publishLiveUpdate } from "@/lib/live-updates";
 
 const eventSchema = z.object({
   id: z.string().min(8).max(80),
@@ -39,5 +40,6 @@ export async function POST(request: Request) {
   db.prepare(
     "UPDATE devices SET last_seen_at = ?, pending_events = ? WHERE id = ?",
   ).run(new Date().toISOString(), parsed.data.pendingCount ?? 0, device.id);
+  if (parsed.data.events.length) publishLiveUpdate("clock");
   return Response.json({ results, serverTime: new Date().toISOString() });
 }
