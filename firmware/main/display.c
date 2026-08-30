@@ -108,8 +108,8 @@ static void handle_keypress(const char *text)
         if (strlen(s_pin) == 4) {
             char employee_name[48]; bool clocked_in = false;
             esp_err_t err = tk_api_submit_code(s_pin, employee_name, &clocked_in);
-            if (err == ESP_ERR_NOT_FOUND) set_status("Code not recognised — try again", 0xC43D3D);
-            else if (err == ESP_ERR_INVALID_STATE || err == ESP_FAIL) set_status("Offline — connect to clock in", 0xC47B24);
+            if (err == ESP_ERR_NOT_FOUND) set_status("Code not recognised - try again", 0xC43D3D);
+            else if (err == ESP_ERR_INVALID_STATE || err == ESP_FAIL) set_status("Offline - connect to clock in", 0xC47B24);
             else if (err == ESP_OK) {
                 char message[96]; snprintf(message, sizeof(message), "%s, %s!", clocked_in ? "Welcome" : "Goodbye", employee_name);
                 set_status(message, clocked_in ? 0x168455 : 0x526159);
@@ -166,7 +166,7 @@ static void build_setup_ui(void)
 {
     s_setup_screen = lv_obj_create(lv_screen_active());
     lv_obj_remove_style_all(s_setup_screen); lv_obj_set_size(s_setup_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_setup_screen, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_setup_screen, LV_OPA_COVER, 0); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_t *eyebrow = lv_label_create(s_setup_screen); lv_label_set_text(eyebrow, "ESP TIMEKEEP  •  OFFLINE"); lv_obj_set_style_text_color(eyebrow, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(eyebrow, &lv_font_montserrat_14, 0); lv_obj_set_pos(eyebrow, 18, 24);
+    lv_obj_t *eyebrow = lv_label_create(s_setup_screen); lv_label_set_text(eyebrow, "ESP TIMEKEEP  -  OFFLINE"); lv_obj_set_style_text_color(eyebrow, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(eyebrow, &lv_font_montserrat_14, 0); lv_obj_set_pos(eyebrow, 18, 24);
     lv_obj_t *title = lv_label_create(s_setup_screen); lv_label_set_text(title, "NO NETWORK"); lv_obj_set_style_text_color(title, lv_color_white(), 0); lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0); lv_obj_set_pos(title, 18, 58);
     lv_obj_t *message = lv_label_create(s_setup_screen); lv_label_set_text(message, "Connect to this access point\nto configure the terminal."); lv_obj_set_style_text_color(message, lv_color_hex(0xC8D0C9), 0); lv_obj_set_style_text_font(message, &lv_font_montserrat_14, 0); lv_obj_set_pos(message, 18, 100);
     lv_obj_t *card = lv_obj_create(s_setup_screen); lv_obj_remove_style_all(card); lv_obj_set_size(card, 204, 122); lv_obj_set_pos(card, 18, 158); lv_obj_set_style_bg_color(card, lv_color_hex(0x26352C), 0); lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0); lv_obj_set_style_radius(card, 12, 0); lv_obj_set_style_pad_all(card, 14, 0);
@@ -184,7 +184,9 @@ esp_err_t tk_display_init(void)
     esp_lcd_panel_io_spi_config_t io_config = { .dc_gpio_num = PIN_LCD_DC, .cs_gpio_num = PIN_LCD_CS, .pclk_hz = 40 * 1000 * 1000, .lcd_cmd_bits = 8, .lcd_param_bits = 8, .spi_mode = 0, .trans_queue_depth = 10 };
     esp_lcd_panel_io_handle_t io;
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &io_config, &io));
-    esp_lcd_panel_dev_config_t panel_config = { .reset_gpio_num = PIN_LCD_RST, .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR, .bits_per_pixel = 16 };
+    // The web palette is RGB; use the panel's RGB order so Coral/Ocean/Lime/
+    // Violet render with the same hues on the physical terminal.
+    esp_lcd_panel_dev_config_t panel_config = { .reset_gpio_num = PIN_LCD_RST, .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB, .bits_per_pixel = 16 };
     esp_lcd_panel_handle_t panel;
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io, &panel_config, &panel));
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel)); ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
@@ -226,12 +228,12 @@ void tk_display_set_online(bool online)
     s_online = online; _lock_acquire(&s_lvgl_lock);
     if (online) {
         lv_obj_clear_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);
-        set_status("Online · synced", 0x168455);
+        set_status("Online - synced", 0x168455);
     } else {
         char details[96]; snprintf(details, sizeof(details), "%s\nPassword: timekeep", tk_network_setup_ssid());
         lv_label_set_text(s_setup_details, details);
         lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);
-        set_status("Offline · events will queue", 0xC47B24);
+        set_status("Offline - events will queue", 0xC47B24);
     }
     _lock_release(&s_lvgl_lock);
 }
@@ -240,7 +242,7 @@ void tk_display_refresh(void)
 {
     if (!s_count_label) return;
     int employees, pending; tk_state_t *state = tk_state_lock(); employees = state->employee_count; pending = state->event_count; tk_state_unlock();
-    char text[64]; snprintf(text, sizeof(text), "%d people · %d pending", employees, pending);
+    char text[64]; snprintf(text, sizeof(text), "%d people - %d pending", employees, pending);
     _lock_acquire(&s_lvgl_lock); lv_label_set_text(s_count_label, text); _lock_release(&s_lvgl_lock);
 }
 

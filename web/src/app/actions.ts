@@ -15,6 +15,10 @@ const employeeSchema = z.object({
   code: z.string().regex(/^[ABCD]{4}$/),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
 });
+const employeeUpdateSchema = employeeSchema.extend({
+  id: z.string().min(1),
+  code: z.string().regex(/^[ABCD]{4}$/).or(z.literal("")),
+});
 
 export async function login(formData: FormData) {
   const password = String(formData.get("password") || "");
@@ -65,6 +69,21 @@ export async function toggleEmployee(formData: FormData) {
     "UPDATE employees SET active = CASE active WHEN 1 THEN 0 ELSE 1 END, updated_at = ? WHERE id = ?",
   ).run(new Date().toISOString(), id);
   revalidatePath("/employees");
+}
+
+export async function updateEmployee(formData: FormData) {
+  await requireAuth();
+  const data = employeeUpdateSchema.parse(Object.fromEntries(formData));
+  const now = new Date().toISOString();
+  if (data.code) {
+    db.prepare("UPDATE employees SET name = ?, email = ?, role = ?, code_digest = ?, color = ?, updated_at = ? WHERE id = ?")
+      .run(data.name, data.email || null, data.role || null, sha256(data.code), data.color, now, data.id);
+  } else {
+    db.prepare("UPDATE employees SET name = ?, email = ?, role = ?, color = ?, updated_at = ? WHERE id = ?")
+      .run(data.name, data.email || null, data.role || null, data.color, now, data.id);
+  }
+  revalidatePath("/employees");
+  revalidatePath("/");
 }
 
 export async function approveDevice(formData: FormData) {

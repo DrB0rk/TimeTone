@@ -98,7 +98,7 @@ static esp_err_t save_handler(httpd_req_t *request)
     while (strlen(config.server_url) && config.server_url[strlen(config.server_url) - 1] == '/') config.server_url[strlen(config.server_url) - 1] = 0;
     ESP_ERROR_CHECK(tk_config_save(&config));
     httpd_resp_set_type(request, "text/html");
-    httpd_resp_sendstr(request, "<html><body style='font:18px system-ui;padding:40px'><h1>Saved</h1><p>The terminal is restarting…</p></body></html>");
+    httpd_resp_sendstr(request, "<html><body style='font:18px system-ui;padding:40px'><h1>Saved</h1><p>The terminal is restarting...</p></body></html>");
     vTaskDelay(pdMS_TO_TICKS(800));
     esp_restart();
     return ESP_OK;
