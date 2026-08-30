@@ -147,6 +147,9 @@ static void build_clock_ui(void)
     s_pin_label = lv_label_create(s_main_screen); lv_obj_set_size(s_pin_label, 212, 38); lv_obj_set_style_bg_color(s_pin_label, lv_color_white(), 0); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_COVER, 0); lv_obj_set_style_border_width(s_pin_label, 1, 0); lv_obj_set_style_border_color(s_pin_label, lv_color_hex(0xD4D8D1), 0); lv_obj_set_style_radius(s_pin_label, 10, 0); lv_obj_set_style_pad_left(s_pin_label, 12, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 14, 78);
     s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 30); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_WRAP); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 120);
     s_keypad = lv_obj_create(s_main_screen); lv_obj_remove_style_all(s_keypad); lv_obj_set_size(s_keypad, 212, 132); lv_obj_set_pos(s_keypad, 14, 153);
+    // Keep this row-major order in sync with the web color picker:
+    // top-left Coral (A), top-right Ocean (B), bottom-left Lime (C),
+    // bottom-right Violet (D).
     static const char *keys[] = { "A", "B", "C", "D" };
     static const uint32_t colors[] = { 0xEF6F61, 0x3D8BFD, 0x9ACB3C, 0x9B72CF };
     for (int i = 0; i < 4; ++i) {

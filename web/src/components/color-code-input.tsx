@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+// Row-major order must match the terminal: Coral, Ocean, Lime, Violet.
 const COLORS = [
   { code: "A", label: "Coral", color: "#ef6f61" },
   { code: "B", label: "Ocean", color: "#3d8bfd" },
@@ -14,7 +15,7 @@ export function ColorCodeInput({ name }: { name: string }) {
   return (
     <div className="space-y-3">
       <input type="hidden" name={name} value={value} />
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-flow-row grid-cols-2 grid-rows-2 gap-2">
         {COLORS.map((item) => (
           <button
             key={item.code}
