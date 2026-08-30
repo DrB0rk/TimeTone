@@ -12,10 +12,12 @@ RUN npm run build
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+RUN apk add --no-cache tzdata
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 RUN mkdir -p /data
 ENV DATABASE_PATH=/data/timekeep.db
+ENV TZ=Europe/Amsterdam
 EXPOSE 3000
 CMD ["node", "server.js"]

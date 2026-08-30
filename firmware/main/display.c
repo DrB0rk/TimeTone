@@ -45,7 +45,7 @@ static const char *TAG = "display";
 static _lock_t s_lvgl_lock;
 static lv_display_t *s_display;
 static lv_obj_t *s_main_screen, *s_setup_screen, *s_settings_screen, *s_calibration_screen, *s_header;
-static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_count_label;
+static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_count_label, *s_brand_label;
 static lv_obj_t *s_setup_details;
 static char s_pin[9];
 static bool s_online;
@@ -54,10 +54,44 @@ static uint8_t s_calibration_step;
 static uint16_t s_calibration_x[4], s_calibration_y[4];
 static lv_obj_t *s_calibration_hint;
 static lv_obj_t *s_calibration_progress;
+static volatile bool s_screen_sleeping;
+static volatile bool s_screen_off;
+static bool s_discard_wake_touch;
+static int64_t s_last_activity_us;
 
 static bool dark_theme(void) { return strcmp(tk_config_get()->terminal_theme, "dark") == 0; }
 static uint32_t bg_color(void) { return dark_theme() ? 0x17211B : 0xF5F6F2; }
 static uint32_t fg_color(void) { return dark_theme() ? 0xF4F7F2 : 0x17211B; }
+static void apply_theme_styles(void);
+
+static void set_backlight(bool on)
+{
+    gpio_set_level(PIN_LCD_BL, on ? 1 : 0);
+    gpio_set_level(PIN_LCD_BL_ALT, on ? 1 : 0);
+}
+
+static void set_screen_off(bool off)
+{
+    if (s_screen_off == off) return;
+    s_screen_off = off;
+    set_backlight(!off);
+}
+
+static void set_screen_sleeping(bool sleeping)
+{
+    if (s_screen_sleeping == sleeping) return;
+    s_screen_sleeping = sleeping;
+    if (sleeping) set_screen_off(true);
+    tk_network_set_low_power(sleeping);
+    if (!sleeping) tk_api_wake();
+}
+
+static void register_activity(void)
+{
+    s_last_activity_us = esp_timer_get_time();
+    if (s_screen_off) set_screen_off(false);
+    if (s_screen_sleeping) set_screen_sleeping(false);
+}
 
 static bool flush_done(esp_lcd_panel_io_handle_t io, esp_lcd_panel_io_event_data_t *data, void *ctx)
 {
@@ -78,6 +112,11 @@ static void touch_cb(lv_indev_t *indev, lv_indev_data_t *data)
     uint16_t x[1], y[1]; uint8_t count = 0;
     esp_lcd_touch_read_data(touch);
     if (esp_lcd_touch_get_coordinates(touch, x, y, NULL, &count, 1) && count) {
+        bool woke_screen = s_screen_off;
+        register_activity();
+        // The first tap only wakes a sleeping screen; it must not also clock
+        // somebody in or activate a settings button.
+        if (woke_screen || s_discard_wake_touch) { s_discard_wake_touch = false; data->state = LV_INDEV_STATE_RELEASED; return; }
         if (s_calibrating) {
             if (!s_calibration_wait_release) {
                 s_calibration_x[s_calibration_step] = x[0];
@@ -121,10 +160,29 @@ static void tick_cb(void *argument) { lv_tick_inc(2); }
 static void lvgl_task(void *argument)
 {
     while (true) {
+        // The XPT2046 IRQ remains asserted while the panel backlight is off.
+        // Watch it directly so the first physical tap wakes a blank display
+        // even on boards whose coordinate poll pauses during inactivity.
+        if (s_screen_off && gpio_get_level(PIN_TOUCH_IRQ) == 0) {
+            s_discard_wake_touch = true;
+            s_last_activity_us = esp_timer_get_time();
+            set_screen_off(false);
+            set_screen_sleeping(false);
+        }
         _lock_acquire(&s_lvgl_lock);
         uint32_t wait = lv_timer_handler();
         _lock_release(&s_lvgl_lock);
+        int64_t idle_us = esp_timer_get_time() - s_last_activity_us;
+        uint16_t screen_off_timeout = tk_config_get()->screen_off_timeout_seconds;
+        uint16_t low_power_timeout = tk_config_get()->low_power_timeout_seconds;
+        if (screen_off_timeout && !s_screen_off && idle_us >= (int64_t)screen_off_timeout * 1000000LL) {
+            set_screen_off(true);
+        }
+        if (low_power_timeout && !s_screen_sleeping && idle_us >= (int64_t)low_power_timeout * 1000000LL) {
+            set_screen_sleeping(true);
+        }
         wait = wait < 2 ? 2 : (wait > 100 ? 100 : wait);
+        if (s_screen_sleeping && wait < 250) wait = 250;
         usleep(wait * 1000);
     }
 }
@@ -192,8 +250,12 @@ static void settings_theme_event(lv_event_t *event)
 {
     tk_config_t updated = *tk_config_get();
     strlcpy(updated.terminal_theme, dark_theme() ? "light" : "dark", sizeof(updated.terminal_theme));
+    updated.terminal_theme_override = true;
     tk_config_save(&updated);
-    tk_display_apply_settings();
+    // Event callbacks already execute inside lv_timer_handler while the LVGL
+    // lock is held. Taking it again here deadlocks the UI task, so use the
+    // lock-free helper that is specifically safe from this context.
+    apply_theme_styles();
 }
 
 static void settings_calibrate_event(lv_event_t *event)
@@ -235,7 +297,7 @@ static void build_clock_ui(void)
     lv_obj_remove_style_all(s_main_screen); lv_obj_set_size(s_main_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_main_screen, lv_color_hex(bg_color()), 0); lv_obj_set_style_bg_opa(s_main_screen, LV_OPA_COVER, 0);
     s_header = lv_obj_create(s_main_screen);
     lv_obj_remove_style_all(s_header); lv_obj_set_size(s_header, H_RES, 46); lv_obj_set_style_bg_color(s_header, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_header, LV_OPA_COVER, 0);
-    lv_obj_t *brand = lv_label_create(s_header); lv_label_set_text(brand, "ESP TIMEKEEP"); lv_obj_set_style_text_color(brand, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(brand, &lv_font_montserrat_14, 0); lv_obj_align(brand, LV_ALIGN_LEFT_MID, 14, 0);
+    s_brand_label = lv_label_create(s_header); lv_label_set_text(s_brand_label, "ESP TIMEKEEP"); lv_label_set_long_mode(s_brand_label, LV_LABEL_LONG_DOT); lv_obj_set_width(s_brand_label, 112); lv_obj_set_style_text_color(s_brand_label, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_brand_label, &lv_font_montserrat_14, 0); lv_obj_align(s_brand_label, LV_ALIGN_LEFT_MID, 14, 0);
     s_clock_label = lv_label_create(s_header); lv_obj_set_style_text_color(s_clock_label, lv_color_white(), 0); lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0); lv_obj_align(s_clock_label, LV_ALIGN_RIGHT_MID, -14, 0);
     lv_obj_t *settings = lv_button_create(s_header); lv_obj_set_size(settings, 34, 28); lv_obj_align(settings, LV_ALIGN_RIGHT_MID, -66, 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x34443A), 0); lv_obj_set_style_radius(settings, 8, 0); lv_obj_set_style_border_width(settings, 0, 0); lv_obj_add_event_cb(settings, open_settings_event, LV_EVENT_CLICKED, NULL); lv_obj_t *settings_label = lv_label_create(settings); lv_label_set_text(settings_label, "SET"); lv_obj_set_style_text_font(settings_label, &lv_font_montserrat_14, 0); lv_obj_center(settings_label);
     lv_obj_t *prompt = lv_label_create(s_main_screen); lv_label_set_text(prompt, "Clock in or out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(fg_color()), 0); lv_obj_set_pos(prompt, 14, 55);
@@ -340,7 +402,7 @@ esp_err_t tk_display_init(void)
     esp_timer_handle_t timer; ESP_ERROR_CHECK(esp_timer_create(&tick_args, &timer)); ESP_ERROR_CHECK(esp_timer_start_periodic(timer, 2000));
     build_clock_ui(); build_setup_ui(); build_settings_ui(); build_calibration_ui(); tk_display_refresh();
     xTaskCreate(lvgl_task, "lvgl", 6144, NULL, 5, NULL);
-    gpio_set_level(PIN_LCD_BL, 1); gpio_set_level(PIN_LCD_BL_ALT, 1);
+    s_last_activity_us = esp_timer_get_time(); set_backlight(true);
     ESP_LOGI(TAG, "display initialized");
     return ESP_OK;
 }
@@ -380,15 +442,30 @@ void tk_display_show_setup(void)
     _lock_release(&s_lvgl_lock);
 }
 
-void tk_display_apply_settings(void)
+static void apply_theme_styles(void)
 {
-    if (!s_main_screen) return;
-    _lock_acquire(&s_lvgl_lock);
     bool dark = dark_theme();
     lv_obj_set_style_bg_color(s_main_screen, lv_color_hex(dark ? 0x17211B : 0xF5F6F2), 0);
     lv_obj_set_style_bg_color(s_pin_label, lv_color_hex(dark ? 0x26352C : 0xFFFFFF), 0);
     lv_obj_set_style_border_color(s_pin_label, lv_color_hex(dark ? 0x45564A : 0xD4D8D1), 0);
     lv_obj_set_style_text_color(s_pin_label, lv_color_hex(dark ? 0xF4F7F2 : 0x17211B), 0);
     lv_obj_set_style_text_color(s_count_label, lv_color_hex(dark ? 0xB5C0B6 : 0x788078), 0);
+}
+
+void tk_display_apply_settings(void)
+{
+    if (!s_main_screen) return;
+    _lock_acquire(&s_lvgl_lock);
+    apply_theme_styles();
     _lock_release(&s_lvgl_lock);
 }
+
+void tk_display_set_company_name(const char *name)
+{
+    if (!s_brand_label || !name || !name[0]) return;
+    _lock_acquire(&s_lvgl_lock);
+    lv_label_set_text(s_brand_label, name);
+    _lock_release(&s_lvgl_lock);
+}
+
+bool tk_display_is_sleeping(void) { return s_screen_sleeping; }

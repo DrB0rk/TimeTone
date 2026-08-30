@@ -1,4 +1,4 @@
-import { Clock3, KeyRound, Save, Settings2, SlidersHorizontal, Wifi } from "lucide-react";
+import { Clock3, KeyRound, Save, Settings2, SlidersHorizontal } from "lucide-react";
 import { changePassword, saveSettings } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
@@ -40,11 +40,9 @@ export default async function SettingsPage(
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900">Automatic changes appear with their reason in the Time entries audit trail. You can always edit a result manually.</div>
         </SettingsSection>
 
-        <SettingsSection icon={Wifi} title="Reports & terminal sync" description="Defaults for visual reporting and the connected ESP32 fleet.">
+        <SettingsSection icon={SlidersHorizontal} title="Reports" description="Set the default time window for reporting. Terminal-specific options live on each device card.">
           <div className="grid gap-5 sm:grid-cols-3">
             <SelectField label="Default report window" name="default_report_window" value={settings.default_report_window} options={[["7", "7 days"], ["14", "14 days"], ["30", "30 days"], ["90", "90 days"], ["365", "12 months"]]} />
-            <NumberField label="Sync interval" name="sync_interval_seconds" defaultValue={settings.sync_interval_seconds} suffix="seconds" min={2} max={60} description="Used by terminals after their next refresh." />
-            <SelectField label="Terminal theme" name="terminal_theme" value={settings.terminal_theme} options={[["light", "Light"], ["dark", "Dark"]]} />
           </div>
         </SettingsSection>
         <Button type="submit" size="lg" className="bg-[#17211b] text-white hover:bg-[#26352c]"><Save className="size-4" />Save workspace settings</Button>

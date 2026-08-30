@@ -42,6 +42,10 @@ export type Device = {
   pending_events: number;
   created_at: string;
   approved: number;
+  sync_interval_seconds: number;
+  screen_off_timeout_seconds: number;
+  low_power_timeout_seconds: number;
+  terminal_theme: string;
 };
 
 export type AppSettings = {

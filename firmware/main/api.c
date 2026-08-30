@@ -97,7 +97,10 @@ static esp_err_t fetch_config(void)
     cJSON *settings = cJSON_GetObjectItem(root, "settings");
     if (cJSON_IsObject(settings)) {
         cJSON *interval = cJSON_GetObjectItem(settings, "syncIntervalSeconds");
+        cJSON *screen_off_timeout = cJSON_GetObjectItem(settings, "screenOffTimeoutSeconds");
+        cJSON *low_power_timeout = cJSON_GetObjectItem(settings, "lowPowerTimeoutSeconds");
         cJSON *theme = cJSON_GetObjectItem(settings, "terminalTheme");
+        cJSON *company_name = cJSON_GetObjectItem(settings, "companyName");
         tk_config_t updated = *tk_config_get();
         bool changed = false;
         if (cJSON_IsNumber(interval)) {
@@ -105,11 +108,23 @@ static esp_err_t fetch_config(void)
             s_sync_interval_seconds = seconds;
             if (updated.sync_interval_seconds != seconds) { updated.sync_interval_seconds = seconds; changed = true; }
         }
-        if (cJSON_IsString(theme) && (strcmp(theme->valuestring, "dark") == 0 || strcmp(theme->valuestring, "light") == 0) && strcmp(updated.terminal_theme, theme->valuestring) != 0) {
+        if (cJSON_IsNumber(screen_off_timeout) && cJSON_IsNumber(low_power_timeout)) {
+            uint16_t screen_seconds = (uint16_t)(screen_off_timeout->valuedouble < 0 ? 0 : screen_off_timeout->valuedouble > 3600 ? 3600 : screen_off_timeout->valuedouble);
+            uint16_t low_power_seconds = (uint16_t)(low_power_timeout->valuedouble < 0 ? 0 : low_power_timeout->valuedouble > 3600 ? 3600 : low_power_timeout->valuedouble);
+            if (low_power_seconds && screen_seconds && low_power_seconds < screen_seconds) low_power_seconds = screen_seconds;
+            if (updated.screen_off_timeout_seconds != screen_seconds || updated.low_power_timeout_seconds != low_power_seconds || !updated.power_timeouts_configured) {
+                updated.screen_off_timeout_seconds = screen_seconds;
+                updated.low_power_timeout_seconds = low_power_seconds;
+                updated.power_timeouts_configured = true;
+                changed = true;
+            }
+        }
+        if (!updated.terminal_theme_override && cJSON_IsString(theme) && (strcmp(theme->valuestring, "dark") == 0 || strcmp(theme->valuestring, "light") == 0) && strcmp(updated.terminal_theme, theme->valuestring) != 0) {
             strlcpy(updated.terminal_theme, theme->valuestring, sizeof(updated.terminal_theme));
             changed = true;
         }
         if (changed) { tk_config_save(&updated); tk_display_apply_settings(); }
+        if (cJSON_IsString(company_name)) tk_display_set_company_name(company_name->valuestring);
     }
     cJSON_Delete(root);
     tk_display_refresh();
@@ -191,7 +206,7 @@ static void heartbeat(void)
 static void api_task(void *argument)
 {
     while (true) {
-        if (tk_network_connected() && tk_config_get()->configured) {
+        if (tk_network_connected() && tk_config_get()->configured && !tk_display_is_sleeping()) {
             tk_display_set_online(true);
             // Keep the terminal's employee list fresh while the server is
             // being configured, and after an administrator approves pairing.

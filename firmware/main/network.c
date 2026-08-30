@@ -188,3 +188,10 @@ esp_err_t tk_network_init(void)
 bool tk_network_connected(void) { return (xEventGroupGetBits(s_events) & CONNECTED_BIT) != 0; }
 const char *tk_network_setup_ssid(void) { return s_ap_ssid; }
 void tk_network_ip(char *output, size_t size) { strlcpy(output, s_ip, size); }
+
+void tk_network_set_low_power(bool enabled)
+{
+    // Keep the station associated but let the radio sleep between beacons
+    // while the terminal display is idle.
+    esp_wifi_set_ps(enabled ? WIFI_PS_MAX_MODEM : WIFI_PS_NONE);
+}

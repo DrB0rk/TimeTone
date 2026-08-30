@@ -18,8 +18,10 @@ export function GET(request: Request) {
       timezone: settings.timezone,
       roundingMinutes: Number(settings.rounding_minutes),
       roundingMode: settings.rounding_mode,
-      syncIntervalSeconds: Number(settings.sync_interval_seconds),
-      terminalTheme: settings.terminal_theme,
+      syncIntervalSeconds: device.sync_interval_seconds,
+      screenOffTimeoutSeconds: device.screen_off_timeout_seconds,
+      lowPowerTimeoutSeconds: device.low_power_timeout_seconds,
+      terminalTheme: device.terminal_theme,
       duplicateWindowSeconds: Number(settings.duplicate_window_seconds),
     },
     employees: getEmployees(false).map((employee) => ({

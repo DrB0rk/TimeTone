@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Clock3,
+  ScanLine,
   Cpu,
   LayoutDashboard,
   LogOut,
@@ -18,6 +19,7 @@ const navigation = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/employees", label: "Employees", icon: Users },
   { href: "/entries", label: "Time entries", icon: Clock3 },
+  { href: "/events", label: "Terminal events", icon: ScanLine },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/devices", label: "Devices", icon: Cpu },
   { href: "/settings", label: "Settings", icon: Settings },

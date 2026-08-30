@@ -49,6 +49,11 @@ db.exec(`
     firmware_version TEXT,
     ip_address TEXT,
     pending_events INTEGER NOT NULL DEFAULT 0,
+    sync_interval_seconds INTEGER NOT NULL DEFAULT 5,
+    sleep_timeout_seconds INTEGER NOT NULL DEFAULT 120,
+    screen_off_timeout_seconds INTEGER NOT NULL DEFAULT 30,
+    low_power_timeout_seconds INTEGER NOT NULL DEFAULT 120,
+    terminal_theme TEXT NOT NULL DEFAULT 'light',
     created_at TEXT NOT NULL,
     approved INTEGER NOT NULL DEFAULT 1
   );
@@ -88,6 +93,15 @@ try {
   db.exec("ALTER TABLE devices ADD COLUMN approved INTEGER NOT NULL DEFAULT 1");
 } catch {
   // Existing databases already have the approval column.
+}
+for (const migration of [
+  "ALTER TABLE devices ADD COLUMN sync_interval_seconds INTEGER NOT NULL DEFAULT 5",
+  "ALTER TABLE devices ADD COLUMN sleep_timeout_seconds INTEGER NOT NULL DEFAULT 120",
+  "ALTER TABLE devices ADD COLUMN terminal_theme TEXT NOT NULL DEFAULT 'light'",
+  "ALTER TABLE devices ADD COLUMN screen_off_timeout_seconds INTEGER NOT NULL DEFAULT 30",
+  "ALTER TABLE devices ADD COLUMN low_power_timeout_seconds INTEGER NOT NULL DEFAULT 120",
+]) {
+  try { db.exec(migration); } catch { /* column already exists */ }
 }
 
 const defaults = {
@@ -384,6 +398,17 @@ export const processClockEvent = db.transaction((
 
 export function getDevices() {
   return db.prepare("SELECT * FROM devices ORDER BY name").all() as Device[];
+}
+
+export function getDeviceEvents(filters: { deviceId?: string; employeeId?: string; type?: string; search?: string } = {}) {
+  const where: string[] = [];
+  const values: string[] = [];
+  if (filters.deviceId) { where.push("e.device_id = ?"); values.push(filters.deviceId); }
+  if (filters.employeeId) { where.push("e.employee_id = ?"); values.push(filters.employeeId); }
+  if (filters.type === "CLOCK_IN" || filters.type === "CLOCK_OUT") { where.push("e.event_type = ?"); values.push(filters.type); }
+  if (filters.search) { where.push("(employee.name LIKE ? OR device.name LIKE ? OR e.id LIKE ?)"); values.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`); }
+  const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  return db.prepare(`SELECT e.*, employee.name AS employee_name, device.name AS device_name FROM device_events e JOIN employees employee ON employee.id = e.employee_id JOIN devices device ON device.id = e.device_id ${clause} ORDER BY e.occurred_at DESC LIMIT 1000`).all(...values) as Array<{ id: string; device_id: string; employee_id: string; event_type: "CLOCK_IN" | "CLOCK_OUT"; occurred_at: string; received_at: string; employee_name: string; device_name: string }>;
 }
 
 export function findDeviceByToken(token: string) {

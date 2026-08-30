@@ -11,7 +11,7 @@ beforeAll(async () => {
   dbModule = await import("./db");
   const now = "2026-08-30T08:00:00.000Z";
   dbModule.db.prepare("INSERT INTO employees VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)").run("employee-1", "Morgan", null, null, dbModule.sha256("ABCD"), "#000000", now, now);
-  dbModule.db.prepare("INSERT INTO devices VALUES (?, ?, ?, NULL, NULL, NULL, 0, ?, 1)").run("device-1", "Test terminal", dbModule.sha256("device-token"), now);
+  dbModule.db.prepare("INSERT INTO devices (id, name, token_digest, last_seen_at, firmware_version, ip_address, pending_events, created_at, approved) VALUES (?, ?, ?, NULL, NULL, NULL, 0, ?, 1)").run("device-1", "Test terminal", dbModule.sha256("device-token"), now);
   const set = dbModule.db.prepare("INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
   set.run("auto_merge_enabled", "true");
   set.run("auto_merge_minutes", "5");

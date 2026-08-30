@@ -22,6 +22,12 @@ typedef struct {
     int16_t touch_y_offset;
     uint16_t touch_x_scale;
     uint16_t touch_y_scale;
+    bool terminal_theme_override;
+    uint16_t sleep_timeout_seconds;
+    bool sleep_timeout_configured;
+    uint16_t screen_off_timeout_seconds;
+    uint16_t low_power_timeout_seconds;
+    bool power_timeouts_configured;
 } tk_config_t;
 
 typedef struct {

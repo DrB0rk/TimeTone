@@ -110,6 +110,18 @@ export async function renameDevice(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function saveDeviceSettings(formData: FormData) {
+  await requireAuth();
+  const id = z.string().uuid().parse(formData.get("id"));
+  const screenOffTimeout = z.coerce.number().int().min(0).max(3600).parse(formData.get("screen_off_timeout_seconds"));
+  const lowPowerTimeout = z.coerce.number().int().min(0).max(3600).parse(formData.get("low_power_timeout_seconds"));
+  if (lowPowerTimeout && screenOffTimeout && lowPowerTimeout < screenOffTimeout) throw new Error("Low-power timeout must be longer than screen-off timeout");
+  const syncInterval = z.coerce.number().int().min(2).max(60).parse(formData.get("sync_interval_seconds"));
+  db.prepare("UPDATE devices SET screen_off_timeout_seconds = ?, low_power_timeout_seconds = ?, sync_interval_seconds = ? WHERE id = ?")
+    .run(screenOffTimeout, lowPowerTimeout, syncInterval, id);
+  revalidatePath("/devices");
+}
+
 export async function saveSettings(formData: FormData) {
   await requireAuth();
   const values = {
@@ -129,8 +141,6 @@ export async function saveSettings(formData: FormData) {
     max_shift_hours: z.coerce.number().min(1).max(24).parse(formData.get("max_shift_hours")).toString(),
     duplicate_window_seconds: z.coerce.number().int().min(0).max(120).parse(formData.get("duplicate_window_seconds")).toString(),
     default_report_window: z.enum(["7", "14", "30", "90", "365"]).parse(formData.get("default_report_window")),
-    sync_interval_seconds: z.coerce.number().int().min(2).max(60).parse(formData.get("sync_interval_seconds")).toString(),
-    terminal_theme: z.enum(["light", "dark"]).parse(formData.get("terminal_theme")),
   };
   const statement = db.prepare(
     "INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",

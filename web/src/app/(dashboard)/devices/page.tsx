@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
-import { Cpu, Pencil, Plus } from "lucide-react";
-import { approveDevice, rejectDevice, renameDevice } from "@/app/actions";
+import { Cpu, Pencil, Plus, SlidersHorizontal } from "lucide-react";
+import { approveDevice, rejectDevice, renameDevice, saveDeviceSettings } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -85,6 +85,31 @@ export default function DevicesPage() {
                     </dd>
                   </div>
                 </dl>
+                {device.approved === 1 && (
+                  <details className="mt-5 border-t border-black/6 pt-4">
+                    <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-black/70"><SlidersHorizontal className="size-4" />Device settings</summary>
+                    <p className="mt-2 text-xs leading-4 text-black/45">These controls apply only to this terminal on its next sync.</p>
+                    <form action={saveDeviceSettings} className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <input type="hidden" name="id" value={device.id} />
+                      <label className="space-y-1.5 text-xs font-medium text-black/60">Screen off
+                        <select name="screen_off_timeout_seconds" defaultValue={String(device.screen_off_timeout_seconds)} className="block h-9 w-full rounded-lg border border-black/10 bg-white px-2 text-sm font-normal">
+                          <option value="0">Never</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="120">2 minutes</option><option value="300">5 minutes</option><option value="600">10 minutes</option><option value="900">15 minutes</option>
+                        </select>
+                      </label>
+                      <label className="space-y-1.5 text-xs font-medium text-black/60">Low-power mode
+                        <select name="low_power_timeout_seconds" defaultValue={String(device.low_power_timeout_seconds)} className="block h-9 w-full rounded-lg border border-black/10 bg-white px-2 text-sm font-normal">
+                          <option value="0">Never</option><option value="60">1 minute</option><option value="120">2 minutes</option><option value="300">5 minutes</option><option value="600">10 minutes</option><option value="900">15 minutes</option><option value="1800">30 minutes</option><option value="3600">1 hour</option>
+                        </select>
+                      </label>
+                      <label className="space-y-1.5 text-xs font-medium text-black/60">Sync interval
+                        <select name="sync_interval_seconds" defaultValue={String(device.sync_interval_seconds)} className="block h-9 w-full rounded-lg border border-black/10 bg-white px-2 text-sm font-normal">
+                          <option value="2">2 seconds</option><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option>
+                        </select>
+                      </label>
+                      <Button type="submit" size="sm" className="sm:col-span-2 bg-[#17211b] text-white hover:bg-[#26352c]">Save device settings</Button>
+                    </form>
+                  </details>
+                )}
                 {device.approved === 0 && (
                   <div className="mt-5 flex gap-2 border-t border-black/6 pt-4">
                     <form action={approveDevice} className="flex-1">
