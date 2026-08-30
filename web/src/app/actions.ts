@@ -28,7 +28,9 @@ export async function login(formData: FormData) {
   store.set(SESSION_COOKIE, await createSession(), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    // Plain HTTP is useful for a trusted LAN install. Enable explicitly when
+    // the service is served through HTTPS (see COOKIE_SECURE in .env.example).
+    secure: process.env.COOKIE_SECURE === "true",
     path: "/",
     maxAge: 43200,
   });

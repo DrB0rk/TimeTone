@@ -5,7 +5,9 @@
 ```bash
 cd web
 cp .env.example .env
-# Edit every value, then:
+# Edit every value. Keep COOKIE_SECURE=false for plain HTTP on a trusted LAN;
+# set COOKIE_SECURE=true when the app is behind an HTTPS reverse proxy.
+# Then:
 docker compose up -d --build
 ```
 
@@ -41,4 +43,3 @@ Copy the backup out of the volume and test restoration periodically.
 The partition table contains two 1.8 MiB OTA slots. Version 0.1.0 reports its
 version and is OTA-ready at the partition level; automated signed rollout is a
 planned follow-up. For this first product, update over USB with `idf.py flash`.
-
