@@ -5,6 +5,7 @@ import { PageHeading } from "@/components/page-heading";
 import { StatCard } from "@/components/stat-card";
 import { durationMinutes, formatDuration, roundDuration } from "@/lib/domain";
 import { getDevices, getEmployees, getEntries, getSettings } from "@/lib/db";
+import { OfficePresenceCanvas } from "@/components/office-presence-canvas";
 
 export default function OverviewPage() {
   const settings = getSettings(),
@@ -145,7 +146,8 @@ export default function OverviewPage() {
               ? `${open.length} teammate${open.length === 1 ? "" : "s"} in`
               : "The office is quiet"}
           </h2>
-          <div className="mt-6 space-y-3">
+          <OfficePresenceCanvas people={open.map((entry) => ({ id: entry.id, name: entry.employee_name, color: "#d8ff62", since: entry.clock_in }))} />
+          <div className="mt-5 space-y-3">
             {open.map((entry, index) => (
               <div
                 key={entry.id}
