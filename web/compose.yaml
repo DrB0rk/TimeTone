@@ -3,7 +3,7 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${TIMETONE_PORT:-3000}:3000"
     env_file: .env
     environment:
       DATABASE_PATH: /data/timekeep.db

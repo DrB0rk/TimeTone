@@ -1,8 +1,20 @@
-# Getting started
+# Getting started with TimeTone
 
-## 1. Run the server
+## 1. Install the dashboard
 
-The web application requires Node.js 24 and uses Deno for the checked-in lock
+For a supported self-hosted installation, use the interactive installer from
+the repository root:
+
+```bash
+./install.sh
+```
+
+It asks for an admin password, timezone and port, writes `web/.env` with a
+random session secret, then starts Docker Compose. Open the printed LAN URL and
+sign in. The dashboard starts with no employees or devices, so it is ready for
+your organisation rather than demo data.
+
+For local development instead, the web application requires Node.js 24 and uses Deno for the checked-in lock
 file in this development environment.
 
 ```bash
@@ -11,16 +23,15 @@ cp .env.example .env
 ```
 
 Set secure values in `.env`. `ADMIN_SECRET` should contain at least 32 random
-bytes and each device token should be unique. Then run:
+bytes. Then run:
 
 ```bash
 deno install --allow-scripts=npm:better-sqlite3
 npm run dev
 ```
 
-Open `http://localhost:3000`. The development defaults are admin password
-The server starts without demo employees or devices. Add an employee and choose
-a color sequence in **Employees**, then approve the terminal in **Devices**.
+Open `http://localhost:3000`. Add an employee and choose a colour sequence in
+**Employees**, then approve the terminal in **Devices**.
 
 ## 2. Build and flash the terminal
 
@@ -43,9 +54,9 @@ After first boot the display shows the setup SSID. Join
 
 - the office 2.4 GHz Wi-Fi network;
 - the externally reachable server URL, without a trailing slash;
-- the same device token registered in the dashboard.
 
-The board restarts, synchronises time and employees, and enables the keypad.
+The board generates and retains its own device credential; no token needs to be
+entered by an administrator. It restarts, synchronises time and employees, and enables the keypad.
 If the saved Wi-Fi is unavailable for 20 seconds, the setup network returns.
 
 ## 4. Clock time
@@ -54,6 +65,16 @@ Choose exactly four colors; the terminal submits automatically after the fourth 
 and clock-out. The event is stored before sync, so a short server or Wi-Fi
 outage does not lose it. The dashboard calculates rounded time per completed
 session while retaining exact timestamps.
+
+## 5. Update over USB
+
+For an existing terminal, open **Devices** in Chrome or Edge on desktop using
+an HTTPS dashboard URL (or `localhost`). In **USB firmware update**, select the
+`timetone.bin` built by ESP-IDF or supplied by a TimeTone release, connect the
+terminal by USB, and choose **Flash connected terminal**. The updater writes
+only the application partition at `0x20000`, so saved Wi-Fi and server settings
+are preserved. A factory-fresh board still needs the full ESP-IDF flash command
+from step 2.
 
 ## Verification commands
 

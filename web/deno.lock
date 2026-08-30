@@ -13,6 +13,7 @@
     "npm:date-fns@^4.4.0": "4.4.0",
     "npm:eslint-config-next@16.3.3": "16.3.3_eslint@9.39.5_typescript@5.9.3",
     "npm:eslint@9": "9.39.5",
+    "npm:esptool-js@0.6.1": "0.6.1",
     "npm:jose@^6.2.10": "6.2.10",
     "npm:lucide-react@^1.37.0": "1.37.0_react@19.2.8",
     "npm:next@16.3.3": "16.3.3_react@19.2.8_react-dom@19.2.8__react@19.2.8",
@@ -929,7 +930,7 @@
         "@alloc/quick-lru",
         "@tailwindcss/node",
         "@tailwindcss/oxide",
-        "postcss@8.5.23",
+        "postcss@8.5.26",
         "tailwindcss"
       ]
     },
@@ -1432,6 +1433,9 @@
     },
     "async-function@1.0.0": {
       "integrity": "sha512-hsU18Ae8CDTR6Kgu9DYf0EbCr/a5iGL0rytQDobUcdpYOKokk8LEjVphnXkDkgpi0wYVsqrXuP0bZxJaTqdgoA=="
+    },
+    "atob-lite@2.0.0": {
+      "integrity": "sha512-LEeSAWeh2Gfa2FtlQE1shxQ8zi5F9GHarrGKz08TMdODD5T4eH6BMsvtnhbWZ+XQn+Gb6om/917ucvRu7l7ukw=="
     },
     "atomically@1.7.0": {
       "integrity": "sha512-Xcz9l0z7y9yQ9rdDaxlmaI4uJHf/T8g9hOEzJcsEqX2SjCj4J20uK7+ldkDHMbpJDK76wF7xEIgxc/vSlsfw5w=="
@@ -2166,6 +2170,14 @@
     "esprima@4.0.1": {
       "integrity": "sha512-eGuFFw7Upda+g4p+QHvnW0RyTX/SVeJBDM/gCtMARO0cLuT2HcEKnTPvhjV6aGeqrCB/sbNop0Kszm0jsaWU4A==",
       "bin": true
+    },
+    "esptool-js@0.6.1": {
+      "integrity": "sha512-WNgQTfaEIgHyEiT56pI5v7Tq6Pzjc2XaibLxAtWY4v3zE2Ofk5ImkJY5foEUr0JrdkfHWf6rNizAewN4/kSpHw==",
+      "dependencies": [
+        "atob-lite",
+        "pako",
+        "tslib"
+      ]
     },
     "esquery@1.7.0": {
       "integrity": "sha512-Ap6G0WQwcU/LHsvLwON1fAQX9Zp0A2Y6Y/cJBl9r/JbW90Zyg4/zbG6zzKa2OTALELarYHmKu0GhpM5EO+7T0g==",
@@ -3451,6 +3463,9 @@
     "p-try@2.2.0": {
       "integrity": "sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ=="
     },
+    "pako@2.2.0": {
+      "integrity": "sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w=="
+    },
     "parent-module@1.0.1": {
       "integrity": "sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==",
       "dependencies": [
@@ -3845,7 +3860,7 @@
         "kleur@4.1.5",
         "open@11.0.2",
         "ora",
-        "postcss@8.5.23",
+        "postcss@8.5.26",
         "postcss-selector-parser",
         "prompts",
         "recast",
@@ -4524,6 +4539,7 @@
         "npm:date-fns@^4.4.0",
         "npm:eslint-config-next@16.3.3",
         "npm:eslint@9",
+        "npm:esptool-js@0.6.1",
         "npm:jose@^6.2.10",
         "npm:lucide-react@^1.37.0",
         "npm:next@16.3.3",

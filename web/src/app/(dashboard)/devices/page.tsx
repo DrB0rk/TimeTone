@@ -2,6 +2,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Cpu, Pencil, Plus, SlidersHorizontal } from "lucide-react";
 import { approveDevice, rejectDevice, renameDevice, saveDeviceSettings } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
+import { UsbFirmwareUpdater } from "@/components/usb-firmware-updater";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getDevices } from "@/lib/db";
@@ -128,7 +129,8 @@ export default function DevicesPage() {
             );
           })}
         </div>
-        <div className="h-fit rounded-2xl bg-[#17211b] p-6 text-white">
+        <div className="grid h-fit gap-6">
+        <div className="rounded-2xl bg-[#17211b] p-6 text-white">
           <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-xl bg-[#d8ff62] text-[#17211b]">
               <Plus className="size-5" />
@@ -148,6 +150,8 @@ export default function DevicesPage() {
               No device token is required. Each terminal creates its own secure credential.
             </div>
           </div>
+        </div>
+          <UsbFirmwareUpdater />
         </div>
       </div>
     </>

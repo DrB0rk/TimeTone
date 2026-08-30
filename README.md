@@ -1,9 +1,58 @@
 # TimeTone
 
-TimeTone is an offline-first office time clock for the ESP32-2432S028R
-"Cheap Yellow Display" (CYD). Employees clock in and out with a personal code
-on the touchscreen. A companion web application manages employees and devices,
-shows live attendance, and reports rounded working time.
+TimeTone is a self-hosted, offline-first office time clock for the
+**ESP32-2432S032 Cheap Yellow Display (CYD)**. Employees clock in and out by
+tapping a four-colour personal code. The accompanying dashboard manages the
+team, terminals, time corrections and exportable reports.
+
+<p align="center"><img src="web/public/timetone-mark.svg" width="96" alt="TimeTone logo"></p>
+
+## What you get
+
+- A fast, accessible touchscreen terminal with a four-colour keypad
+- Offline queueing: a terminal retains clock events during Wi-Fi or server outages
+- Live attendance, employee management, editable time entries and audit events
+- Per-device power, screen and sync settings
+- CSV exports and exact/rounded-hours reporting
+- Device setup portal, secure per-device credentials and browser USB updates
+- A single-container dashboard with SQLite storage and a persistent Docker volume
+
+## Install the dashboard
+
+On a Linux host with Docker Engine and Docker Compose v2, clone a release and
+run the interactive installer:
+
+```bash
+git clone https://github.com/DrB0rk/TimeTone.git
+cd TimeTone
+./install.sh
+```
+
+The installer creates a private `web/.env`, asks for the admin password,
+timezone and LAN port, then starts the dashboard. Open the address it prints,
+sign in, create employees, and configure the terminal. For unattended installs:
+
+```bash
+TIMETONE_ADMIN_PASSWORD='use-a-long-unique-password' \
+TIMEKEEP_TIMEZONE='Europe/Amsterdam' TIMETONE_PORT=3000 \
+./install.sh --non-interactive
+```
+
+See [deployment and operations](docs/DEPLOYMENT.md) for HTTPS, backups and
+updates. An HTTPS address (or `localhost`) is required for browser USB updates
+because Web Serial is a secure-context browser feature.
+
+## Set up a terminal
+
+1. Flash a factory-fresh ESP32-2432S032 using the [firmware instructions](firmware/README.md).
+2. Join the displayed `TimeTone-XXXX` Wi-Fi network (default password: `timekeep`).
+3. Visit `http://192.168.4.1`, enter office Wi-Fi and the dashboard URL.
+4. Approve the new terminal from **Devices** in the dashboard.
+5. Create employees and assign their four-colour codes in **Employees**.
+
+Terminals automatically fall back to their setup Wi-Fi when saved Wi-Fi cannot
+be joined. Keep the initial setup network physically controlled; it is intended
+for provisioning rather than general office Wi-Fi access.
 
 ## Repository layout
 
@@ -11,7 +60,7 @@ shows live attendance, and reports rounded working time.
 - `web/` — Next.js dashboard, REST API, and SQLite-backed server
 - `docs/` — hardware, API, operations, and deployment documentation
 
-## Quick start
+## Development
 
 ```bash
 # Web application
@@ -27,23 +76,16 @@ idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
-On a factory-fresh terminal, join the `TimeTone-XXXX` Wi-Fi network with
-password `timekeep`, open `http://192.168.4.1`, and enter Wi-Fi plus the server
-URL. The terminal creates its own credential and appears in the dashboard for
-approval. The local demo dashboard password is `timekeep`; employee
-Demo records are disabled by default. Create employees and their color
-sequences from the web UI before using a terminal.
+The dashboard has no demo employees or devices by default. The development
+password is only the value in your local `web/.env`; set a unique password and
+secret before exposing it to a network.
 
 See [Getting started](docs/GETTING_STARTED.md), [hardware](docs/HARDWARE.md),
 [deployment](docs/DEPLOYMENT.md), and the [device API](docs/API.md).
 
-## Current product features
+## Support and security
 
-- Four-color touchscreen clock-in/out with clear employee feedback
-- Offline employee cache and a persistent 48-event sync queue
-- Wi-Fi setup portal plus automatic fallback access point
-- HTTPS device API, per-device bearer tokens, idempotent events, and heartbeat
-- Admin login, employee/device management, live attendance, correction entry
-- Exact and independently rounded totals, configurable policy, CSV export
-- SQLite WAL storage, Docker deployment, persistent volumes, and health checks
-- Dual OTA-ready application partitions and semver firmware reporting
+Please read [the security guidance](docs/DEPLOYMENT.md#security-checklist)
+before exposing TimeTone beyond a trusted LAN. File product issues in this
+repository; do not include credentials, employee data or device tokens in
+public issues.
