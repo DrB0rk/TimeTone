@@ -192,7 +192,10 @@ esp_err_t tk_display_init(void)
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel)); ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
     // The S032 uses a native 240x320 ST7789 portrait panel. Clear MV/MX/MY
     // for the requested 90-degree counter-clockwise portrait orientation.
-    ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel, true)); ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel, false)); ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel, false, false)); ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
+    // This panel revision already uses normal polarity.  Inverting here makes
+    // the palette render as its complementary colors (Coral becomes cyan,
+    // Ocean becomes yellow, etc.), so leave inversion disabled.
+    ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel, false)); ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel, false)); ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel, false, false)); ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
     lv_init();
     s_display = lv_display_create(H_RES, V_RES);
     size_t buffer_size = H_RES * 30 * sizeof(lv_color16_t);
