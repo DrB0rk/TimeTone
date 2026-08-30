@@ -16,6 +16,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "storage.h"
+#include "display.h"
 
 static const char *TAG = "network";
 static EventGroupHandle_t s_events;
@@ -129,11 +130,13 @@ static void event_handler(void *arg, esp_event_base_t base, int32_t id, void *da
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) esp_wifi_connect();
     else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         xEventGroupClearBits(s_events, CONNECTED_BIT);
+        tk_display_set_online(false);
         esp_wifi_connect();
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = data;
         snprintf(s_ip, sizeof(s_ip), IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(s_events, CONNECTED_BIT);
+        tk_display_set_online(true);
         start_sntp_once();
         ESP_LOGI(TAG, "connected with IP %s", s_ip);
     }

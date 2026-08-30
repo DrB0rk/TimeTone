@@ -22,6 +22,7 @@
 
 static const char *TAG = "display";
 #define LCD_HOST SPI2_HOST
+#define TOUCH_HOST SPI3_HOST
 #define PIN_LCD_SCLK 14
 #define PIN_LCD_MOSI 13
 #define PIN_LCD_MISO 12
@@ -33,6 +34,9 @@ static const char *TAG = "display";
 // connected unit did so with the previous firmware); GPIO27 is used by the
 // other S032/ST7789 run. Drive both harmless control nets for compatibility.
 #define PIN_LCD_BL_ALT 21
+#define PIN_TOUCH_SCLK 25
+#define PIN_TOUCH_MOSI 32
+#define PIN_TOUCH_MISO 39
 #define PIN_TOUCH_CS 33
 #define PIN_TOUCH_IRQ 36
 #define H_RES 240
@@ -198,10 +202,11 @@ esp_err_t tk_display_init(void)
     lv_display_set_user_data(s_display, panel); lv_display_set_color_format(s_display, LV_COLOR_FORMAT_RGB565); lv_display_set_flush_cb(s_display, flush_cb);
     esp_lcd_panel_io_callbacks_t callbacks = { .on_color_trans_done = flush_done };
     ESP_ERROR_CHECK(esp_lcd_panel_io_register_event_callbacks(io, &callbacks, s_display));
-    // S032's XPT2046 shares the LCD SPI pins (CS 33, IRQ 36). The LCD is
-    // write-only, but GPIO12 remains on the bus as touch MISO.
+    // The XPT2046 on this unit is on the dedicated touch SPI bus.
+    spi_bus_config_t touch_bus = { .sclk_io_num = PIN_TOUCH_SCLK, .mosi_io_num = PIN_TOUCH_MOSI, .miso_io_num = PIN_TOUCH_MISO, .quadwp_io_num = -1, .quadhd_io_num = -1, .max_transfer_sz = 64 };
+    ESP_ERROR_CHECK(spi_bus_initialize(TOUCH_HOST, &touch_bus, SPI_DMA_CH_AUTO));
     esp_lcd_panel_io_spi_config_t touch_io_config = ESP_LCD_TOUCH_IO_SPI_XPT2046_CONFIG(PIN_TOUCH_CS);
-    esp_lcd_panel_io_handle_t touch_io; ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &touch_io_config, &touch_io));
+    esp_lcd_panel_io_handle_t touch_io; ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)TOUCH_HOST, &touch_io_config, &touch_io));
     esp_lcd_touch_config_t touch_config = { .x_max = H_RES, .y_max = V_RES, .rst_gpio_num = -1, .int_gpio_num = PIN_TOUCH_IRQ, .flags = { .swap_xy = 0, .mirror_x = 0, .mirror_y = 0 } };
     esp_lcd_touch_handle_t touch; ESP_ERROR_CHECK(esp_lcd_touch_new_spi_xpt2046(touch_io, &touch_config, &touch));
     lv_indev_t *indev = lv_indev_create(); lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); lv_indev_set_display(indev, s_display); lv_indev_set_user_data(indev, touch); lv_indev_set_read_cb(indev, touch_cb);

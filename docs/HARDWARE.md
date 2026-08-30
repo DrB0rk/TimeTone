@@ -15,14 +15,15 @@ firmware uses that native portrait orientation and enables panel inversion.
 | LCD chip select | 15 |
 | LCD data/command | 2 |
 | LCD backlight | 27 (also drives 21 for S032 variants) |
-| Touch clock (shared LCD SPI) | 14 |
-| Touch MOSI (shared LCD SPI) | 13 |
-| Touch MISO (shared LCD SPI) | 12 |
+| Touch clock (dedicated SPI) | 25 |
+| Touch MOSI (dedicated SPI) | 32 |
+| Touch MISO (dedicated SPI) | 39 |
 | Touch chip select | 33 |
 | Touch IRQ | 36 |
 
-The S032 shares one SPI bus between the write-only LCD and XPT2046 touch. The
-firmware uses landscape orientation and the S032 pinout above. Backlight
+The S032 family has production variants; this unit uses a dedicated SPI bus
+for the XPT2046 touch controller. The firmware uses portrait orientation and
+the S032 pinout above. Backlight
 enable is driven on both GPIO27 and GPIO21 because both routings exist across
 S032 production runs.
 

@@ -55,7 +55,11 @@ static int request(const char *path, esp_http_client_method_t method, const char
     esp_http_client_set_header(client, "Content-Type", "application/json");
     if (body) esp_http_client_set_post_field(client, body, strlen(body));
     esp_err_t err = esp_http_client_perform(client);
-    int status = err == ESP_OK ? esp_http_client_get_status_code(client) : -1;
+    // A 401 response can make esp_http_client return ESP_ERR_NOT_SUPPORTED
+    // before ESP_OK (it attempts an auth challenge). Preserve the HTTP status
+    // so the pairing handshake can still run for a new token.
+    int status = esp_http_client_get_status_code(client);
+    if (status <= 0) status = err == ESP_OK ? 200 : -1;
     if (err != ESP_OK) ESP_LOGW(TAG, "%s failed: %s", path, esp_err_to_name(err));
     esp_http_client_cleanup(client);
     return status;
