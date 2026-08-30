@@ -1,0 +1,6 @@
+dependencies:
+  idf: ">=6.0.0"
+  lvgl/lvgl: "9.3.0"
+  espressif/esp_lcd_ili9341: "^2.0.2"
+  atanisoft/esp_lcd_touch_xpt2046: "1.0.6"
+  espressif/cjson: "^1.7.19"

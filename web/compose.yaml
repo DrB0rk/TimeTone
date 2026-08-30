@@ -1,0 +1,14 @@
+services:
+  timekeep:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      DATABASE_PATH: /data/timekeep.db
+    volumes:
+      - timekeep-data:/data
+volumes:
+  timekeep-data:
+

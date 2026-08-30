@@ -13,7 +13,6 @@ firmware/build/
 firmware/sdkconfig
 firmware/sdkconfig.old
 firmware/managed_components/
-firmware/dependencies.lock
 
 # Node / Next.js
 node_modules/
@@ -22,6 +21,7 @@ web/out/
 web/coverage/
 web/*.db
 web/*.db-*
+web/data/
 web/.env
 web/.env.local
 web/playwright-report/
@@ -31,4 +31,3 @@ web/test-results/
 *.log
 *.png
 !docs/**/*.png
-
