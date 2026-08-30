@@ -1,5 +1,6 @@
 #include "storage.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include "esp_log.h"
@@ -37,8 +38,17 @@ esp_err_t tk_storage_init(void)
     s_mutex = xSemaphoreCreateMutex();
     nvs_handle_t handle;
     if (nvs_open("timekeep", NVS_READONLY, &handle) == ESP_OK) {
-        size_t size = sizeof(s_config);
-        nvs_get_blob(handle, "config", &s_config, &size);
+        // Configuration grows as terminal capabilities are added. Read the
+        // stored blob at its original size so installed devices migrate
+        // safely instead of losing Wi-Fi credentials on a firmware update.
+        size_t size = 0;
+        if (nvs_get_blob(handle, "config", NULL, &size) == ESP_OK && size) {
+            void *saved = calloc(1, size);
+            if (saved && nvs_get_blob(handle, "config", saved, &size) == ESP_OK) {
+                memcpy(&s_config, saved, size < sizeof(s_config) ? size : sizeof(s_config));
+            }
+            free(saved);
+        }
         size = sizeof(s_state);
         nvs_get_blob(handle, "state", &s_state, &size);
         nvs_close(handle);
@@ -47,6 +57,10 @@ esp_err_t tk_storage_init(void)
         memset(&s_state, 0, sizeof(s_state));
         s_state.version = 1;
     }
+    if (!s_config.touch_x_scale) s_config.touch_x_scale = 1000;
+    if (!s_config.touch_y_scale) s_config.touch_y_scale = 1000;
+    if (!s_config.sync_interval_seconds) s_config.sync_interval_seconds = 5;
+    if (!s_config.terminal_theme[0]) strlcpy(s_config.terminal_theme, "light", sizeof(s_config.terminal_theme));
     return ESP_OK;
 }
 

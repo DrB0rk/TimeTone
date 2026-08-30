@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
-import { Cpu, Plus } from "lucide-react";
-import { approveDevice, rejectDevice } from "@/app/actions";
+import { Cpu, Pencil, Plus } from "lucide-react";
+import { approveDevice, rejectDevice, renameDevice } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,10 +43,18 @@ export default function DevicesPage() {
                       : online ? "Online" : "Offline"}
                   </Badge>
                 </div>
-                <h2 className="mt-5 font-semibold">{device.name}</h2>
+                <div className="mt-5 flex items-center justify-between gap-2">
+                  <h2 className="min-w-0 truncate font-semibold">{device.name}</h2>
+                  <button type="button" popoverTarget={`rename-${device.id}`} popoverTargetAction="toggle" className="grid size-8 shrink-0 place-items-center rounded-lg border border-black/10 text-black/50 hover:bg-black/[.03]" aria-label={`Rename ${device.name}`}><Pencil className="size-3.5" /></button>
+                </div>
                 <p className="mt-1 font-mono text-xs text-black/35">
                   {device.id}
                 </p>
+                <div id={`rename-${device.id}`} popover="auto" className="fixed inset-0 m-auto w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-white p-5 shadow-xl shadow-black/10" style={{ margin: "auto" }}>
+                  <h3 className="font-semibold">Rename terminal</h3>
+                  <p className="mt-1 text-sm text-black/45">This changes the display name only; pairing and history are kept.</p>
+                  <form action={renameDevice} className="mt-5 space-y-3"><input type="hidden" name="id" value={device.id} /><label className="block text-xs font-medium text-black/55" htmlFor={`name-${device.id}`}>Terminal name</label><input id={`name-${device.id}`} name="name" defaultValue={device.name} className="h-10 w-full rounded-lg border border-black/10 bg-white px-3 text-sm" required /><Button type="submit" className="w-full bg-[#17211b] text-white hover:bg-[#26352c]">Save name</Button></form>
+                </div>
                 <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-black/6 pt-4 text-xs">
                   <div>
                     <dt className="text-black/35">Last contact</dt>

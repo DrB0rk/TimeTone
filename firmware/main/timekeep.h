@@ -5,7 +5,7 @@
 
 #define TK_MAX_EMPLOYEES 32
 #define TK_MAX_EVENTS 48
-#define TK_FIRMWARE_VERSION "0.1.0"
+#define TK_FIRMWARE_VERSION "0.2.0"
 
 typedef struct {
     char ssid[33];
@@ -13,7 +13,15 @@ typedef struct {
     char server_url[160];
     char device_token[129];
     char timezone[64];
+    // Keep this established field in place: config is persisted as an NVS
+    // blob, so later fields must be appended for backward-compatible reads.
     bool configured;
+    char terminal_theme[8];
+    uint16_t sync_interval_seconds;
+    int16_t touch_x_offset;
+    int16_t touch_y_offset;
+    uint16_t touch_x_scale;
+    uint16_t touch_y_scale;
 } tk_config_t;
 
 typedef struct {
@@ -37,4 +45,3 @@ typedef struct {
     tk_employee_t employees[TK_MAX_EMPLOYEES];
     tk_event_t events[TK_MAX_EVENTS];
 } tk_state_t;
-

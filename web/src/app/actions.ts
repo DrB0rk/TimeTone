@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createSession, requireAuth, SESSION_COOKIE, verifyAdminPassword } from "@/lib/auth";
-import { db, sha256 } from "@/lib/db";
+import { db, logTimeEntryChange, runTimeMaintenance, sha256 } from "@/lib/db";
 
 const employeeSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -101,6 +101,15 @@ export async function rejectDevice(formData: FormData) {
   revalidatePath("/devices");
 }
 
+export async function renameDevice(formData: FormData) {
+  await requireAuth();
+  const id = z.string().uuid().parse(formData.get("id"));
+  const name = z.string().trim().min(2).max(80).parse(formData.get("name"));
+  db.prepare("UPDATE devices SET name = ? WHERE id = ?").run(name, id);
+  revalidatePath("/devices");
+  revalidatePath("/");
+}
+
 export async function saveSettings(formData: FormData) {
   await requireAuth();
   const values = {
@@ -114,6 +123,14 @@ export async function saveSettings(formData: FormData) {
     rounding_mode: z.enum(["nearest", "up", "down"]).parse(
       formData.get("rounding_mode"),
     ),
+    auto_merge_enabled: z.enum(["true", "false"]).parse(formData.get("auto_merge_enabled")),
+    auto_merge_minutes: z.coerce.number().int().min(1).max(120).parse(formData.get("auto_merge_minutes")).toString(),
+    auto_close_enabled: z.enum(["true", "false"]).parse(formData.get("auto_close_enabled")),
+    max_shift_hours: z.coerce.number().min(1).max(24).parse(formData.get("max_shift_hours")).toString(),
+    duplicate_window_seconds: z.coerce.number().int().min(0).max(120).parse(formData.get("duplicate_window_seconds")).toString(),
+    default_report_window: z.enum(["7", "14", "30", "90", "365"]).parse(formData.get("default_report_window")),
+    sync_interval_seconds: z.coerce.number().int().min(2).max(60).parse(formData.get("sync_interval_seconds")).toString(),
+    terminal_theme: z.enum(["light", "dark"]).parse(formData.get("terminal_theme")),
   };
   const statement = db.prepare(
     "INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -121,8 +138,10 @@ export async function saveSettings(formData: FormData) {
   db.transaction(() =>
     Object.entries(values).forEach(([key, value]) => statement.run(key, value))
   )();
+  runTimeMaintenance();
   revalidatePath("/");
   revalidatePath("/settings");
+  revalidatePath("/reports");
 }
 
 export async function changePassword(formData: FormData) {
@@ -152,9 +171,10 @@ export async function addManualEntry(formData: FormData) {
     throw new Error("Clock-out must be after clock-in");
   }
   const now = new Date().toISOString();
+  const id = crypto.randomUUID();
   db.prepare("INSERT INTO time_entries VALUES (?, ?, ?, ?, 'manual', ?, ?, ?)")
     .run(
-      crypto.randomUUID(),
+      id,
       employeeId,
       clockIn,
       clockOut,
@@ -162,6 +182,7 @@ export async function addManualEntry(formData: FormData) {
       now,
       now,
     );
+  logTimeEntryChange(id, "manual_create", null, { employeeId, clockIn, clockOut, note }, "Manual entry created");
   revalidatePath("/entries");
   revalidatePath("/");
 }
@@ -193,9 +214,30 @@ export async function updateTimeEntry(formData: FormData) {
     throw new Error("This employee already has an open time entry");
   }
 
+  const before = db.prepare("SELECT * FROM time_entries WHERE id = ?").get(id);
   db.prepare(
     "UPDATE time_entries SET employee_id = ?, clock_in = ?, clock_out = ?, note = ?, updated_at = ? WHERE id = ?",
   ).run(employeeId, clockIn, clockOut, note || null, new Date().toISOString(), id);
+  logTimeEntryChange(
+    id,
+    "manual_edit",
+    before,
+    { ...(before as Record<string, unknown>), employee_id: employeeId, clock_in: clockIn, clock_out: clockOut, note: note || null },
+    "Manual correction from dashboard",
+  );
+  runTimeMaintenance();
+  revalidatePath("/entries");
+  revalidatePath("/");
+  revalidatePath("/reports");
+}
+
+export async function deleteTimeEntry(formData: FormData) {
+  await requireAuth();
+  const id = z.string().uuid().parse(formData.get("id"));
+  const entry = db.prepare("SELECT * FROM time_entries WHERE id = ?").get(id);
+  if (!entry) throw new Error("Time entry not found");
+  db.prepare("DELETE FROM time_entries WHERE id = ?").run(id);
+  logTimeEntryChange(id, "manual_delete", entry, null, "Deleted from dashboard");
   revalidatePath("/entries");
   revalidatePath("/");
   revalidatePath("/reports");

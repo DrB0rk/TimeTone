@@ -44,11 +44,20 @@ static const char *TAG = "display";
 
 static _lock_t s_lvgl_lock;
 static lv_display_t *s_display;
-static lv_obj_t *s_main_screen, *s_setup_screen;
+static lv_obj_t *s_main_screen, *s_setup_screen, *s_settings_screen, *s_calibration_screen, *s_header;
 static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_count_label;
 static lv_obj_t *s_setup_details;
 static char s_pin[9];
 static bool s_online;
+static bool s_calibrating, s_calibration_wait_release;
+static uint8_t s_calibration_step;
+static uint16_t s_calibration_x[4], s_calibration_y[4];
+static lv_obj_t *s_calibration_hint;
+static lv_obj_t *s_calibration_progress;
+
+static bool dark_theme(void) { return strcmp(tk_config_get()->terminal_theme, "dark") == 0; }
+static uint32_t bg_color(void) { return dark_theme() ? 0x17211B : 0xF5F6F2; }
+static uint32_t fg_color(void) { return dark_theme() ? 0xF4F7F2 : 0x17211B; }
 
 static bool flush_done(esp_lcd_panel_io_handle_t io, esp_lcd_panel_io_event_data_t *data, void *ctx)
 {
@@ -69,8 +78,42 @@ static void touch_cb(lv_indev_t *indev, lv_indev_data_t *data)
     uint16_t x[1], y[1]; uint8_t count = 0;
     esp_lcd_touch_read_data(touch);
     if (esp_lcd_touch_get_coordinates(touch, x, y, NULL, &count, 1) && count) {
-        data->point.x = x[0]; data->point.y = y[0]; data->state = LV_INDEV_STATE_PRESSED;
-    } else data->state = LV_INDEV_STATE_RELEASED;
+        if (s_calibrating) {
+            if (!s_calibration_wait_release) {
+                s_calibration_x[s_calibration_step] = x[0];
+                s_calibration_y[s_calibration_step] = y[0];
+                s_calibration_wait_release = true;
+                s_calibration_step++;
+                if (s_calibration_step >= 4) {
+                    int left = (s_calibration_x[0] + s_calibration_x[2]) / 2;
+                    int right = (s_calibration_x[1] + s_calibration_x[3]) / 2;
+                    int top = (s_calibration_y[0] + s_calibration_y[1]) / 2;
+                    int bottom = (s_calibration_y[2] + s_calibration_y[3]) / 2;
+                    tk_config_t updated = *tk_config_get();
+                    if (right != left && bottom != top) {
+                        updated.touch_x_scale = (uint16_t)((190 * 1000) / (right - left));
+                        updated.touch_y_scale = (uint16_t)((150 * 1000) / (bottom - top));
+                        updated.touch_x_offset = 25 - (int16_t)((left * updated.touch_x_scale) / 1000);
+                        updated.touch_y_offset = 92 - (int16_t)((top * updated.touch_y_scale) / 1000);
+                        tk_config_save(&updated);
+                        lv_label_set_text(s_calibration_progress, "Calibration saved\nTap BACK to return");
+                    } else lv_label_set_text(s_calibration_progress, "Calibration failed\nTap BACK to retry");
+                    s_calibrating = false;
+                } else {
+                    static const char *steps[] = { "Top left", "Top right", "Bottom left", "Bottom right" };
+                    char hint[72]; snprintf(hint, sizeof(hint), "Touch %s target", steps[s_calibration_step]);
+                    lv_label_set_text(s_calibration_progress, hint);
+                }
+            }
+            data->state = LV_INDEV_STATE_RELEASED;
+            return;
+        }
+        int adjusted_x = (x[0] * tk_config_get()->touch_x_scale) / 1000 + tk_config_get()->touch_x_offset;
+        int adjusted_y = (y[0] * tk_config_get()->touch_y_scale) / 1000 + tk_config_get()->touch_y_offset;
+        data->point.x = adjusted_x < 0 ? 0 : adjusted_x >= H_RES ? H_RES - 1 : adjusted_x;
+        data->point.y = adjusted_y < 0 ? 0 : adjusted_y >= V_RES ? V_RES - 1 : adjusted_y;
+        data->state = LV_INDEV_STATE_PRESSED;
+    } else { s_calibration_wait_release = false; data->state = LV_INDEV_STATE_RELEASED; }
 }
 
 static void tick_cb(void *argument) { lv_tick_inc(2); }
@@ -113,6 +156,7 @@ static void handle_keypress(const char *text)
             else if (err == ESP_OK) {
                 char message[96]; snprintf(message, sizeof(message), "%s, %s!", clocked_in ? "Welcome" : "Goodbye", employee_name);
                 set_status(message, clocked_in ? 0x168455 : 0x526159);
+                tk_api_wake();
             }
             s_pin[0] = 0;
         }
@@ -135,15 +179,66 @@ static void clock_timer(lv_timer_t *timer)
     lv_label_set_text(s_clock_label, text);
 }
 
+static void show_main_screen(void)
+{
+    lv_obj_clear_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_calibration_screen, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void settings_back_event(lv_event_t *event) { show_main_screen(); }
+
+static void settings_theme_event(lv_event_t *event)
+{
+    tk_config_t updated = *tk_config_get();
+    strlcpy(updated.terminal_theme, dark_theme() ? "light" : "dark", sizeof(updated.terminal_theme));
+    tk_config_save(&updated);
+    tk_display_apply_settings();
+}
+
+static void settings_calibrate_event(lv_event_t *event)
+{
+    s_calibrating = true; s_calibration_wait_release = true; s_calibration_step = 0;
+    lv_label_set_text(s_calibration_hint, "Touch top left target");
+    lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(s_calibration_screen, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void calibration_back_event(lv_event_t *event)
+{
+    s_calibrating = false;
+    lv_obj_add_flag(s_calibration_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
+}
+
+static lv_obj_t *settings_button(lv_obj_t *parent, const char *text, int y, lv_event_cb_t callback)
+{
+    lv_obj_t *button = lv_button_create(parent);
+    lv_obj_set_size(button, 204, 40); lv_obj_set_pos(button, 18, y);
+    lv_obj_set_style_radius(button, 10, 0); lv_obj_set_style_bg_color(button, lv_color_hex(0x26352C), 0);
+    lv_obj_set_style_bg_color(button, lv_color_hex(0xD8FF62), LV_STATE_PRESSED);
+    lv_obj_set_style_border_width(button, 0, 0); lv_obj_add_event_cb(button, callback, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *label = lv_label_create(button); lv_label_set_text(label, text); lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0); lv_obj_center(label);
+    return button;
+}
+
+static void open_settings_event(lv_event_t *event)
+{
+    lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
+    s_calibrating = false;
+}
+
 static void build_clock_ui(void)
 {
     s_main_screen = lv_obj_create(lv_screen_active());
-    lv_obj_remove_style_all(s_main_screen); lv_obj_set_size(s_main_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_main_screen, lv_color_hex(0xF5F6F2), 0); lv_obj_set_style_bg_opa(s_main_screen, LV_OPA_COVER, 0);
-    lv_obj_t *header = lv_obj_create(s_main_screen);
-    lv_obj_remove_style_all(header); lv_obj_set_size(header, H_RES, 46); lv_obj_set_style_bg_color(header, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(header, LV_OPA_COVER, 0);
-    lv_obj_t *brand = lv_label_create(header); lv_label_set_text(brand, "ESP TIMEKEEP"); lv_obj_set_style_text_color(brand, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(brand, &lv_font_montserrat_14, 0); lv_obj_align(brand, LV_ALIGN_LEFT_MID, 14, 0);
-    s_clock_label = lv_label_create(header); lv_obj_set_style_text_color(s_clock_label, lv_color_white(), 0); lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0); lv_obj_align(s_clock_label, LV_ALIGN_RIGHT_MID, -14, 0);
-    lv_obj_t *prompt = lv_label_create(s_main_screen); lv_label_set_text(prompt, "Clock in or out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(0x17211B), 0); lv_obj_set_pos(prompt, 14, 55);
+    lv_obj_remove_style_all(s_main_screen); lv_obj_set_size(s_main_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_main_screen, lv_color_hex(bg_color()), 0); lv_obj_set_style_bg_opa(s_main_screen, LV_OPA_COVER, 0);
+    s_header = lv_obj_create(s_main_screen);
+    lv_obj_remove_style_all(s_header); lv_obj_set_size(s_header, H_RES, 46); lv_obj_set_style_bg_color(s_header, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_header, LV_OPA_COVER, 0);
+    lv_obj_t *brand = lv_label_create(s_header); lv_label_set_text(brand, "ESP TIMEKEEP"); lv_obj_set_style_text_color(brand, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(brand, &lv_font_montserrat_14, 0); lv_obj_align(brand, LV_ALIGN_LEFT_MID, 14, 0);
+    s_clock_label = lv_label_create(s_header); lv_obj_set_style_text_color(s_clock_label, lv_color_white(), 0); lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0); lv_obj_align(s_clock_label, LV_ALIGN_RIGHT_MID, -14, 0);
+    lv_obj_t *settings = lv_button_create(s_header); lv_obj_set_size(settings, 34, 28); lv_obj_align(settings, LV_ALIGN_RIGHT_MID, -66, 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x34443A), 0); lv_obj_set_style_radius(settings, 8, 0); lv_obj_set_style_border_width(settings, 0, 0); lv_obj_add_event_cb(settings, open_settings_event, LV_EVENT_CLICKED, NULL); lv_obj_t *settings_label = lv_label_create(settings); lv_label_set_text(settings_label, "SET"); lv_obj_set_style_text_font(settings_label, &lv_font_montserrat_14, 0); lv_obj_center(settings_label);
+    lv_obj_t *prompt = lv_label_create(s_main_screen); lv_label_set_text(prompt, "Clock in or out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(fg_color()), 0); lv_obj_set_pos(prompt, 14, 55);
     s_pin_label = lv_label_create(s_main_screen); lv_obj_set_size(s_pin_label, 212, 38); lv_obj_set_style_bg_color(s_pin_label, lv_color_white(), 0); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_COVER, 0); lv_obj_set_style_border_width(s_pin_label, 1, 0); lv_obj_set_style_border_color(s_pin_label, lv_color_hex(0xD4D8D1), 0); lv_obj_set_style_radius(s_pin_label, 10, 0); lv_obj_set_style_pad_left(s_pin_label, 12, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 14, 78);
     s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 30); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_WRAP); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 120);
     s_keypad = lv_obj_create(s_main_screen); lv_obj_remove_style_all(s_keypad); lv_obj_set_size(s_keypad, 212, 132); lv_obj_set_pos(s_keypad, 14, 153);
@@ -173,6 +268,32 @@ static void build_setup_ui(void)
     lv_obj_t *details = lv_label_create(card); lv_label_set_text(details, "SETUP WI-FI"); lv_obj_set_style_text_color(details, lv_color_hex(0xA9B6A9), 0); lv_obj_set_style_text_font(details, &lv_font_montserrat_14, 0); lv_obj_set_pos(details, 14, 12);
     s_setup_details = lv_label_create(card); lv_obj_set_style_text_color(s_setup_details, lv_color_white(), 0); lv_obj_set_style_text_font(s_setup_details, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_setup_details, 14, 38);
     lv_obj_t *hint = lv_label_create(s_setup_screen); lv_label_set_text(hint, "Open 192.168.4.1 in your browser"); lv_obj_set_style_text_color(hint, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0); lv_obj_set_pos(hint, 18, 300);
+}
+
+static void build_settings_ui(void)
+{
+    s_settings_screen = lv_obj_create(lv_screen_active());
+    lv_obj_remove_style_all(s_settings_screen); lv_obj_set_size(s_settings_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_settings_screen, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_settings_screen, LV_OPA_COVER, 0); lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_t *title = lv_label_create(s_settings_screen); lv_label_set_text(title, "TERMINAL SETTINGS"); lv_obj_set_style_text_color(title, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0); lv_obj_set_pos(title, 18, 18);
+    lv_obj_t *subtitle = lv_label_create(s_settings_screen); lv_label_set_text(subtitle, "Display and touch controls"); lv_obj_set_style_text_color(subtitle, lv_color_hex(0xC8D0C9), 0); lv_obj_set_style_text_font(subtitle, &lv_font_montserrat_14, 0); lv_obj_set_pos(subtitle, 18, 44);
+    settings_button(s_settings_screen, "TOGGLE LIGHT / DARK", 82, settings_theme_event);
+    settings_button(s_settings_screen, "CALIBRATE TOUCH", 132, settings_calibrate_event);
+    lv_obj_t *hint_card = lv_obj_create(s_settings_screen); lv_obj_remove_style_all(hint_card); lv_obj_set_size(hint_card, 204, 72); lv_obj_set_pos(hint_card, 18, 188); lv_obj_set_style_bg_color(hint_card, lv_color_hex(0x26352C), 0); lv_obj_set_style_radius(hint_card, 12, 0);
+    s_calibration_hint = lv_label_create(hint_card); lv_label_set_text(s_calibration_hint, "Calibration uses 4 corner taps\nfor accurate input."); lv_obj_set_style_text_font(s_calibration_hint, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(s_calibration_hint, lv_color_white(), 0); lv_obj_set_pos(s_calibration_hint, 12, 12);
+    settings_button(s_settings_screen, "BACK", 274, settings_back_event);
+}
+
+static void build_calibration_ui(void)
+{
+    s_calibration_screen = lv_obj_create(lv_screen_active());
+    lv_obj_remove_style_all(s_calibration_screen); lv_obj_set_size(s_calibration_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_calibration_screen, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_calibration_screen, LV_OPA_COVER, 0); lv_obj_add_flag(s_calibration_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_t *title = lv_label_create(s_calibration_screen); lv_label_set_text(title, "TOUCH CALIBRATION"); lv_obj_set_style_text_color(title, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0); lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 22);
+    s_calibration_progress = lv_label_create(s_calibration_screen); lv_label_set_text(s_calibration_progress, "Touch top left target"); lv_obj_set_style_text_color(s_calibration_progress, lv_color_white(), 0); lv_obj_set_style_text_font(s_calibration_progress, &lv_font_montserrat_14, 0); lv_obj_align(s_calibration_progress, LV_ALIGN_TOP_MID, 0, 54);
+    static const int points[4][2] = { {25, 92}, {215, 92}, {25, 242}, {215, 242} };
+    for (int i = 0; i < 4; ++i) {
+        lv_obj_t *target = lv_label_create(s_calibration_screen); lv_label_set_text(target, "+"); lv_obj_set_style_text_color(target, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(target, &lv_font_montserrat_14, 0); lv_obj_set_pos(target, points[i][0] - 4, points[i][1] - 7);
+    }
+    lv_obj_t *back = lv_button_create(s_calibration_screen); lv_obj_set_size(back, 100, 32); lv_obj_align(back, LV_ALIGN_BOTTOM_MID, 0, -14); lv_obj_set_style_bg_color(back, lv_color_hex(0x34443A), 0); lv_obj_set_style_border_width(back, 0, 0); lv_obj_set_style_radius(back, 9, 0); lv_obj_add_event_cb(back, calibration_back_event, LV_EVENT_CLICKED, NULL); lv_obj_t *back_label = lv_label_create(back); lv_label_set_text(back_label, "BACK"); lv_obj_set_style_text_font(back_label, &lv_font_montserrat_14, 0); lv_obj_center(back_label);
 }
 
 esp_err_t tk_display_init(void)
@@ -217,7 +338,7 @@ esp_err_t tk_display_init(void)
     lv_indev_t *indev = lv_indev_create(); lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); lv_indev_set_display(indev, s_display); lv_indev_set_user_data(indev, touch); lv_indev_set_read_cb(indev, touch_cb);
     const esp_timer_create_args_t tick_args = { .callback = tick_cb, .name = "lvgl_tick" };
     esp_timer_handle_t timer; ESP_ERROR_CHECK(esp_timer_create(&tick_args, &timer)); ESP_ERROR_CHECK(esp_timer_start_periodic(timer, 2000));
-    build_clock_ui(); build_setup_ui(); tk_display_refresh();
+    build_clock_ui(); build_setup_ui(); build_settings_ui(); build_calibration_ui(); tk_display_refresh();
     xTaskCreate(lvgl_task, "lvgl", 6144, NULL, 5, NULL);
     gpio_set_level(PIN_LCD_BL, 1); gpio_set_level(PIN_LCD_BL_ALT, 1);
     ESP_LOGI(TAG, "display initialized");
@@ -256,5 +377,18 @@ void tk_display_show_setup(void)
     char details[96]; snprintf(details, sizeof(details), "%s\nPassword: timekeep", tk_network_setup_ssid());
     lv_label_set_text(s_setup_details, details);
     lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);
+    _lock_release(&s_lvgl_lock);
+}
+
+void tk_display_apply_settings(void)
+{
+    if (!s_main_screen) return;
+    _lock_acquire(&s_lvgl_lock);
+    bool dark = dark_theme();
+    lv_obj_set_style_bg_color(s_main_screen, lv_color_hex(dark ? 0x17211B : 0xF5F6F2), 0);
+    lv_obj_set_style_bg_color(s_pin_label, lv_color_hex(dark ? 0x26352C : 0xFFFFFF), 0);
+    lv_obj_set_style_border_color(s_pin_label, lv_color_hex(dark ? 0x45564A : 0xD4D8D1), 0);
+    lv_obj_set_style_text_color(s_pin_label, lv_color_hex(dark ? 0xF4F7F2 : 0x17211B), 0);
+    lv_obj_set_style_text_color(s_count_label, lv_color_hex(dark ? 0xB5C0B6 : 0x788078), 0);
     _lock_release(&s_lvgl_lock);
 }

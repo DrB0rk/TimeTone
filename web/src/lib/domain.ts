@@ -18,6 +18,18 @@ export type TimeEntry = {
   clock_out: string | null;
   source: string;
   note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TimeEntryChange = {
+  id: string;
+  entry_id: string | null;
+  action: string;
+  before_json: string | null;
+  after_json: string | null;
+  reason: string;
+  created_at: string;
 };
 
 export type Device = {
@@ -37,6 +49,14 @@ export type AppSettings = {
   timezone: string;
   rounding_minutes: string;
   rounding_mode: string;
+  auto_merge_enabled: string;
+  auto_merge_minutes: string;
+  auto_close_enabled: string;
+  max_shift_hours: string;
+  duplicate_window_seconds: string;
+  default_report_window: string;
+  sync_interval_seconds: string;
+  terminal_theme: string;
 };
 
 export function roundDuration(

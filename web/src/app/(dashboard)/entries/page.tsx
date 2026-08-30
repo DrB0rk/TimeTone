@@ -1,19 +1,31 @@
 import { format } from "date-fns";
-import { Pencil, Plus } from "lucide-react";
-import { addManualEntry, updateTimeEntry } from "@/app/actions";
+import { Download, History, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { addManualEntry, deleteTimeEntry, updateTimeEntry } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { durationMinutes, formatDuration, roundDuration } from "@/lib/domain";
-import { getEmployees, getEntries, getSettings } from "@/lib/db";
+import { getEmployees, getEntryChanges, getFilteredEntries, getSettings } from "@/lib/db";
 
-export default function EntriesPage() {
-  const entries = getEntries(),
+type Query = { q?: string; employee?: string; status?: string; source?: string; from?: string; to?: string };
+
+export default async function EntriesPage({ searchParams }: { searchParams: Promise<Query> }) {
+  const query = await searchParams;
+  const entries = getFilteredEntries({
+      search: query.q,
+      employeeId: query.employee || undefined,
+      status: query.status === "open" || query.status === "closed" ? query.status : undefined,
+      source: query.source || undefined,
+      from: query.from ? new Date(`${query.from}T00:00:00`).toISOString() : undefined,
+      to: query.to ? new Date(`${query.to}T23:59:59`).toISOString() : undefined,
+    }),
     employees = getEmployees(false),
     allEmployees = getEmployees(),
-    settings = getSettings();
+    settings = getSettings(),
+    changes = getEntryChanges(8);
+  const queryString = new URLSearchParams(Object.entries(query).filter(([, value]) => value) as [string, string][]).toString();
   return (
     <>
       <PageHeading
@@ -21,7 +33,16 @@ export default function EntriesPage() {
         title="Time entries"
         description="Raw clock times stay intact. Rounded duration is calculated separately for transparent reporting."
       />
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
+      <form className="mb-6 grid gap-3 rounded-2xl border border-black/6 bg-white p-4 shadow-sm shadow-black/[.02] md:grid-cols-[1.35fr_repeat(4,minmax(0,1fr))_auto]">
+        <label className="relative"><Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-black/35" /><input name="q" defaultValue={query.q} placeholder="Search employee or note" className="h-9 w-full rounded-lg border border-black/10 bg-white pl-9 pr-3 text-sm" /></label>
+        <select name="employee" defaultValue={query.employee || ""} className="h-9 rounded-lg border border-black/10 bg-white px-3 text-sm"><option value="">All employees</option>{allEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select>
+        <select name="status" defaultValue={query.status || ""} className="h-9 rounded-lg border border-black/10 bg-white px-3 text-sm"><option value="">All statuses</option><option value="open">Open</option><option value="closed">Closed</option></select>
+        <select name="source" defaultValue={query.source || ""} className="h-9 rounded-lg border border-black/10 bg-white px-3 text-sm"><option value="">All sources</option><option value="device">Device</option><option value="manual">Manual</option><option value="automatic">Automatic</option></select>
+        <div className="flex gap-2"><input aria-label="From date" type="date" name="from" defaultValue={query.from} className="h-9 min-w-0 rounded-lg border border-black/10 px-2 text-sm" /><input aria-label="To date" type="date" name="to" defaultValue={query.to} className="h-9 min-w-0 rounded-lg border border-black/10 px-2 text-sm" /></div>
+        <Button type="submit" variant="outline">Filter</Button>
+      </form>
+      <div className="mb-4 flex items-center justify-between text-sm text-black/45"><span>{entries.length} matching entr{entries.length === 1 ? "y" : "ies"}</span><a href={`/api/export?type=entries&${queryString}`} className="inline-flex items-center gap-1.5 font-medium text-black/60 hover:text-black"><Download className="size-4" />Export this view</a></div>
+      <div className="grid gap-6 2xl:grid-cols-[1fr_360px]">
         <div className="overflow-hidden rounded-2xl border border-black/6 bg-white">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -149,6 +170,7 @@ export default function EntriesPage() {
                               </Button>
                             </form>
                         </div>
+                        <form action={deleteTimeEntry} className="mt-2"><input type="hidden" name="id" value={entry.id} /><Button type="submit" size="xs" variant="ghost" className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"><Trash2 className="size-3" />Delete entry</Button></form>
                       </td>
                     </tr>
                   );
@@ -164,6 +186,7 @@ export default function EntriesPage() {
             </table>
           </div>
         </div>
+        <div className="space-y-6">
         <div className="h-fit rounded-2xl bg-[#17211b] p-6 text-white">
           <div className="mb-5 grid size-10 place-items-center rounded-xl bg-[#d8ff62] text-[#17211b]">
             <Plus className="size-5" />
@@ -207,6 +230,8 @@ export default function EntriesPage() {
               Save entry
             </Button>
           </form>
+        </div>
+        <div className="rounded-2xl border border-black/6 bg-white p-5"><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-lg bg-[#eef4e4] text-[#526b38]"><History className="size-4" /></span><div><h2 className="font-semibold">Recent automation</h2><p className="text-xs text-black/40">Explainable rule decisions</p></div></div><div className="mt-4 space-y-3">{changes.map((change) => <div key={change.id} className="border-l-2 border-[#d8ff62] pl-3"><p className="text-xs font-medium capitalize">{change.action.replaceAll("_", " ")}</p><p className="mt-0.5 text-xs leading-4 text-black/45">{change.reason}</p><p className="mt-1 text-[10px] text-black/35">{format(new Date(change.created_at), "d MMM HH:mm")}</p></div>)}{changes.length === 0 && <p className="text-sm text-black/40">No automatic or manual changes yet.</p>}</div></div>
         </div>
       </div>
     </>

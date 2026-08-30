@@ -17,6 +17,7 @@
 
 static const char *TAG = "api";
 static SemaphoreHandle_t s_wake;
+static uint16_t s_sync_interval_seconds = 5;
 
 typedef struct { char *data; size_t length; size_t capacity; } response_buffer_t;
 
@@ -93,6 +94,23 @@ static esp_err_t fetch_config(void)
     }
     esp_err_t err = tk_state_save();
     tk_state_unlock();
+    cJSON *settings = cJSON_GetObjectItem(root, "settings");
+    if (cJSON_IsObject(settings)) {
+        cJSON *interval = cJSON_GetObjectItem(settings, "syncIntervalSeconds");
+        cJSON *theme = cJSON_GetObjectItem(settings, "terminalTheme");
+        tk_config_t updated = *tk_config_get();
+        bool changed = false;
+        if (cJSON_IsNumber(interval)) {
+            uint16_t seconds = (uint16_t)(interval->valuedouble < 2 ? 2 : interval->valuedouble > 60 ? 60 : interval->valuedouble);
+            s_sync_interval_seconds = seconds;
+            if (updated.sync_interval_seconds != seconds) { updated.sync_interval_seconds = seconds; changed = true; }
+        }
+        if (cJSON_IsString(theme) && (strcmp(theme->valuestring, "dark") == 0 || strcmp(theme->valuestring, "light") == 0) && strcmp(updated.terminal_theme, theme->valuestring) != 0) {
+            strlcpy(updated.terminal_theme, theme->valuestring, sizeof(updated.terminal_theme));
+            changed = true;
+        }
+        if (changed) { tk_config_save(&updated); tk_display_apply_settings(); }
+    }
     cJSON_Delete(root);
     tk_display_refresh();
     return err;
@@ -182,7 +200,8 @@ static void api_task(void *argument)
             push_events();
             heartbeat();
         }
-        xSemaphoreTake(s_wake, pdMS_TO_TICKS(30000));
+        uint16_t seconds = tk_config_get()->sync_interval_seconds ?: s_sync_interval_seconds;
+        xSemaphoreTake(s_wake, pdMS_TO_TICKS(seconds * 1000));
     }
 }
 

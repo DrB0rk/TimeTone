@@ -1,4 +1,4 @@
-import { KeyRound, Save } from "lucide-react";
+import { Clock3, KeyRound, Save, Settings2, SlidersHorizontal, Wifi } from "lucide-react";
 import { changePassword, saveSettings } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
@@ -13,113 +13,74 @@ export default async function SettingsPage(
   const { password } = await searchParams;
   return (
     <>
-      <PageHeading
-        eyebrow="Workspace"
-        title="Settings"
-        description="Company display name, local timezone, and the rounding policy used in summaries."
-      />
-      <form
-        action={saveSettings}
-        className="max-w-2xl rounded-2xl border border-black/6 bg-white p-6"
-      >
-        <div className="space-y-6">
-          <Field
-            label="Company name"
-            name="company_name"
-            defaultValue={settings.company_name}
-          />
-          <Field
-            label="IANA timezone"
-            name="timezone"
-            defaultValue={settings.timezone}
-            description="For example Europe/Amsterdam or America/New_York."
-          />
+      <PageHeading eyebrow="Workspace controls" title="Settings" description="Keep attendance rules transparent, terminals responsive, and reporting consistent." />
+      <form action={saveSettings} className="max-w-4xl space-y-6">
+        <SettingsSection icon={Settings2} title="Workspace" description="How the workspace appears across reports and terminals.">
           <div className="grid gap-5 sm:grid-cols-2">
-            <SelectField
-              label="Rounding interval"
-              name="rounding_minutes"
-              value={settings.rounding_minutes}
-              options={[
-                ["1", "No practical rounding"],
-                ["5", "5 minutes"],
-                ["10", "10 minutes"],
-                ["15", "15 minutes"],
-                ["30", "30 minutes"],
-              ]}
-            />
-            <SelectField
-              label="Rounding direction"
-              name="rounding_mode"
-              value={settings.rounding_mode}
-              options={[["nearest", "Nearest interval"], ["up", "Always up"], [
-                "down",
-                "Always down",
-              ]]}
-            />
+            <Field label="Company name" name="company_name" defaultValue={settings.company_name} />
+            <Field label="IANA timezone" name="timezone" defaultValue={settings.timezone} description="For example Europe/Amsterdam." />
           </div>
-          <div className="rounded-xl bg-[#f5f6f2] p-4 text-xs leading-5 text-black/50">
-            <strong className="text-black/70">Rounding policy:</strong>{" "}
-            Raw clock-in and clock-out timestamps are always retained. Rounding
-            is applied independently to each completed work session in reports.
+        </SettingsSection>
+
+        <SettingsSection icon={Clock3} title="Time rules" description="Raw timestamps are preserved. These rules affect calculated, auditable work sessions.">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <SelectField label="Rounding interval" name="rounding_minutes" value={settings.rounding_minutes} options={[["1", "No practical rounding"], ["5", "5 minutes"], ["10", "10 minutes"], ["15", "15 minutes"], ["30", "30 minutes"]]} />
+            <SelectField label="Rounding direction" name="rounding_mode" value={settings.rounding_mode} options={[["nearest", "Nearest interval"], ["up", "Always up"], ["down", "Always down"]]} />
           </div>
-          <Button type="submit" className="bg-[#17211b]">
-            <Save className="size-4" />Save settings
-          </Button>
-        </div>
+        </SettingsSection>
+
+        <SettingsSection icon={SlidersHorizontal} title="Automatic time management" description="Repair common swipe mistakes automatically; every intervention is recorded in the entry history.">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <SelectField label="Short interruption handling" name="auto_merge_enabled" value={settings.auto_merge_enabled} options={[["true", "Merge into one shift"], ["false", "Keep sessions separate"]]} />
+            <NumberField label="Merge gap window" name="auto_merge_minutes" defaultValue={settings.auto_merge_minutes} suffix="minutes" min={1} max={120} description="A clock-in in this window after clock-out reopens the prior shift." />
+            <SelectField label="Open-shift safety close" name="auto_close_enabled" value={settings.auto_close_enabled} options={[["true", "Automatically close"], ["false", "Leave open for review"]]} />
+            <NumberField label="Maximum shift length" name="max_shift_hours" defaultValue={settings.max_shift_hours} suffix="hours" min={1} max={24} description="Open shifts exceeding this limit are closed and logged." />
+            <NumberField label="Duplicate scan protection" name="duplicate_window_seconds" defaultValue={settings.duplicate_window_seconds} suffix="seconds" min={0} max={120} description="Rapid repeat scans from the same terminal are ignored." />
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900">Automatic changes appear with their reason in the Time entries audit trail. You can always edit a result manually.</div>
+        </SettingsSection>
+
+        <SettingsSection icon={Wifi} title="Reports & terminal sync" description="Defaults for visual reporting and the connected ESP32 fleet.">
+          <div className="grid gap-5 sm:grid-cols-3">
+            <SelectField label="Default report window" name="default_report_window" value={settings.default_report_window} options={[["7", "7 days"], ["14", "14 days"], ["30", "30 days"], ["90", "90 days"], ["365", "12 months"]]} />
+            <NumberField label="Sync interval" name="sync_interval_seconds" defaultValue={settings.sync_interval_seconds} suffix="seconds" min={2} max={60} description="Used by terminals after their next refresh." />
+            <SelectField label="Terminal theme" name="terminal_theme" value={settings.terminal_theme} options={[["light", "Light"], ["dark", "Dark"]]} />
+          </div>
+        </SettingsSection>
+        <Button type="submit" size="lg" className="bg-[#17211b] text-white hover:bg-[#26352c]"><Save className="size-4" />Save workspace settings</Button>
       </form>
-      <section className="mt-6 max-w-2xl rounded-2xl border border-black/6 bg-white p-6">
-        <div className="mb-5 flex items-start gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-[#eef4e4] text-[#526b38]"><KeyRound className="size-5" /></span>
-          <div><h2 className="font-semibold">Admin password</h2><p className="mt-1 text-sm text-black/50">Change the password used to sign in to this dashboard.</p></div>
-        </div>
-        {password === "changed" && <p className="mb-4 rounded-lg bg-[#e8f5e9] px-3 py-2 text-sm text-[#216e39]">Password updated.</p>}
-        {password === "incorrect" && <p className="mb-4 rounded-lg bg-[#fff0ef] px-3 py-2 text-sm text-[#b42318]">Current password is not correct.</p>}
-        {password === "invalid" && <p className="mb-4 rounded-lg bg-[#fff0ef] px-3 py-2 text-sm text-[#b42318]">Use a new password of 8–128 characters and enter it twice.</p>}
-        <form action={changePassword} className="space-y-4">
+
+      <SettingsSection icon={KeyRound} title="Admin password" description="Change the password used to sign in to this dashboard." className="mt-6 max-w-4xl">
+        {password === "changed" && <Notice tone="success">Password updated.</Notice>}
+        {password === "incorrect" && <Notice tone="error">Current password is not correct.</Notice>}
+        {password === "invalid" && <Notice tone="error">Use a new password of 8–128 characters and enter it twice.</Notice>}
+        <form action={changePassword} className="grid gap-4 sm:grid-cols-3">
           <Field label="Current password" name="current_password" type="password" autoComplete="current-password" />
-          <Field label="New password" name="new_password" type="password" autoComplete="new-password" description="At least 8 characters." />
-          <Field label="Confirm new password" name="confirm_password" type="password" autoComplete="new-password" />
-          <Button type="submit" variant="outline"><KeyRound className="size-4" />Change password</Button>
+          <Field label="New password" name="new_password" type="password" autoComplete="new-password" />
+          <Field label="Confirm password" name="confirm_password" type="password" autoComplete="new-password" />
+          <Button type="submit" variant="outline" className="sm:col-span-3 sm:w-fit"><KeyRound className="size-4" />Change password</Button>
         </form>
-      </section>
+      </SettingsSection>
     </>
   );
 }
-function Field(
-  { label, description, ...props }: React.ComponentProps<typeof Input> & {
-    label: string;
-    description?: string;
-  },
-) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={props.name}>{label}</Label>
-      <Input id={props.name} className="bg-white" required {...props} />
-      {description && <p className="text-xs text-black/40">{description}</p>}
-    </div>
-  );
+
+function SettingsSection({ icon: Icon, title, description, className, children }: { icon: typeof Settings2; title: string; description: string; className?: string; children: React.ReactNode }) {
+  return <section className={`rounded-2xl border border-black/6 bg-white p-5 shadow-sm shadow-black/[.02] md:p-6 ${className || ""}`}><div className="mb-6 flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#eef4e4] text-[#526b38]"><Icon className="size-5" /></span><div><h2 className="font-semibold">{title}</h2><p className="mt-1 max-w-2xl text-sm leading-5 text-black/50">{description}</p></div></div><div className="space-y-5">{children}</div></section>;
 }
-function SelectField(
-  { label, name, value, options }: {
-    label: string;
-    name: string;
-    value: string;
-    options: string[][];
-  },
-) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={name}>{label}</Label>
-      <select
-        id={name}
-        name={name}
-        defaultValue={value}
-        className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm"
-      >
-        {options.map(([key, text]) => (
-          <option key={key} value={key}>{text}</option>
-        ))}
-      </select>
-    </div>
-  );
+
+function Notice({ tone, children }: { tone: "success" | "error"; children: React.ReactNode }) {
+  return <p className={`mb-4 rounded-lg px-3 py-2 text-sm ${tone === "success" ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>{children}</p>;
+}
+
+function Field({ label, description, ...props }: React.ComponentProps<typeof Input> & { label: string; description?: string }) {
+  return <div className="space-y-2"><Label htmlFor={props.name}>{label}</Label><Input id={props.name} className="h-10 bg-white" required {...props} />{description && <p className="text-xs text-black/40">{description}</p>}</div>;
+}
+
+function NumberField({ label, suffix, description, ...props }: React.ComponentProps<typeof Input> & { label: string; suffix: string; description?: string }) {
+  return <div className="space-y-2"><Label htmlFor={props.name}>{label}</Label><div className="relative"><Input id={props.name} type="number" className="h-10 bg-white pr-20" required {...props} /><span className="pointer-events-none absolute inset-y-0 right-3 grid place-items-center text-xs text-black/40">{suffix}</span></div>{description && <p className="text-xs text-black/40">{description}</p>}</div>;
+}
+
+function SelectField({ label, name, value, options }: { label: string; name: string; value: string; options: string[][] }) {
+  return <div className="space-y-2"><Label htmlFor={name}>{label}</Label><select id={name} name={name} defaultValue={value} className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm">{options.map(([key, text]) => <option key={key} value={key}>{text}</option>)}</select></div>;
 }

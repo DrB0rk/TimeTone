@@ -18,6 +18,9 @@ export function GET(request: Request) {
       timezone: settings.timezone,
       roundingMinutes: Number(settings.rounding_minutes),
       roundingMode: settings.rounding_mode,
+      syncIntervalSeconds: Number(settings.sync_interval_seconds),
+      terminalTheme: settings.terminal_theme,
+      duplicateWindowSeconds: Number(settings.duplicate_window_seconds),
     },
     employees: getEmployees(false).map((employee) => ({
       id: employee.id,
