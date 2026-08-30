@@ -12,7 +12,7 @@ export function StatCard(
   return (
     <div
       className={accent
-        ? "rounded-2xl bg-[#d8ff62] p-5 shadow-sm"
+        ? "stat-card-accent rounded-2xl bg-[#d8ff62] p-5 shadow-sm"
         : "rounded-2xl border border-black/6 bg-white p-5 shadow-sm shadow-black/[.025]"}
     >
       <div className="flex items-center justify-between">
