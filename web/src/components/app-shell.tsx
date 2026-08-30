@@ -11,7 +11,10 @@ import {
   LogOut,
   Settings,
   Users,
+  Moon,
+  Sun,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { logout } from "@/app/actions";
 import { cn } from "@/lib/utils";
 
@@ -29,8 +32,15 @@ export function AppShell(
   { children, companyName }: { children: React.ReactNode; companyName: string },
 ) {
   const pathname = usePathname();
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const saved = localStorage.getItem("timekeep-theme");
+    const enabled = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.classList.toggle("dark", enabled);
+  }, []);
+  const toggleTheme = () => { const next = !document.documentElement.classList.contains("dark"); setDark(next); localStorage.setItem("timekeep-theme", next ? "dark" : "light"); document.documentElement.classList.toggle("dark", next); };
   return (
-    <div className="min-h-screen bg-[#f5f6f2] text-[#17211b]">
+    <div className="min-h-screen bg-[#f5f6f2] text-[#17211b] transition-colors duration-500 dark:bg-[#101712] dark:text-[#edf5ee]">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col bg-[#17211b] text-white lg:flex">
         <div className="flex h-20 items-center gap-3 border-b border-white/10 px-6">
           <div className="grid size-10 place-items-center rounded-xl bg-[#d8ff62] text-[#17211b]">
@@ -68,7 +78,7 @@ export function AppShell(
         </form>
       </aside>
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-black/6 bg-[#f5f6f2]/90 px-4 backdrop-blur md:px-8 lg:h-20">
+        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-black/6 bg-[#f5f6f2]/90 px-4 backdrop-blur md:px-8 lg:h-20 dark:border-white/10 dark:bg-[#101712]/90">
           <Link
             href="/"
             className="flex items-center gap-2 font-semibold lg:hidden"
@@ -92,10 +102,13 @@ export function AppShell(
               </Link>
             ))}
           </nav>
-          <div className="ml-auto hidden items-center gap-2 text-sm text-black/50 lg:flex">
+          <div className="ml-auto hidden items-center gap-2 text-sm text-black/50 dark:text-white/55 lg:flex">
             <span className="size-2 rounded-full bg-emerald-500" />System
             operational
           </div>
+          <button onClick={toggleTheme} className="ml-3 grid size-9 place-items-center rounded-xl border border-black/10 bg-white text-black/60 transition duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-white/8 dark:text-white/75" aria-label="Toggle color theme">
+            {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          </button>
         </header>
         <main className="mx-auto max-w-[1500px] p-4 md:p-8">{children}</main>
       </div>

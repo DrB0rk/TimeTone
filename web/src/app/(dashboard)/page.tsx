@@ -1,4 +1,4 @@
-import { Activity, Clock3, Cpu, Users } from "lucide-react";
+import { Activity, ArrowUpRight, Clock3, Cpu, Sparkles, Users } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { PageHeading } from "@/components/page-heading";
@@ -43,7 +43,10 @@ export default function OverviewPage() {
         title="Good day. Here’s the pulse."
         description="Live attendance and the numbers that matter, without the spreadsheet work."
       />
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="animate-rise-in overflow-hidden rounded-3xl bg-[#17211b] p-6 text-white md:p-8">
+        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end"><div><p className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1 text-xs font-medium text-[#d8ff62]"><Sparkles className="size-3.5" />Live office pulse</p><h2 className="mt-4 text-3xl font-semibold tracking-tight">{open.length ? `${open.length} people are building today.` : "Ready for the next check-in."}</h2><p className="mt-2 max-w-xl text-sm leading-6 text-white/55">Attendance is live from your connected terminals. Raw activity and rounded reporting stay separately auditable.</p></div><a href="/events" className="inline-flex items-center gap-2 text-sm font-medium text-[#d8ff62] transition hover:translate-x-1">Open terminal event feed <ArrowUpRight className="size-4" /></a></div>
+      </section>
+      <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Currently in"
           value={String(open.length)}
@@ -73,7 +76,7 @@ export default function OverviewPage() {
         />
       </section>
       <section className="mt-8 grid gap-6 xl:grid-cols-[1.35fr_.65fr]">
-        <div className="overflow-hidden rounded-2xl border border-black/6 bg-white shadow-sm shadow-black/[.025]">
+        <div className="animate-rise-in overflow-hidden rounded-2xl border border-black/6 bg-white shadow-sm shadow-black/[.025]" style={{ animationDelay: "80ms" }}>
           <div className="flex items-center justify-between border-b border-black/6 p-5">
             <div>
               <h2 className="font-semibold">Latest activity</h2>
@@ -133,7 +136,7 @@ export default function OverviewPage() {
             )}
           </div>
         </div>
-        <div className="rounded-2xl bg-[#17211b] p-6 text-white">
+        <div className="animate-rise-in rounded-2xl bg-[#17211b] p-6 text-white" style={{ animationDelay: "140ms" }}>
           <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#d8ff62]">
             Who’s here
           </p>
@@ -143,12 +146,13 @@ export default function OverviewPage() {
               : "The office is quiet"}
           </h2>
           <div className="mt-6 space-y-3">
-            {open.map((entry) => (
+            {open.map((entry, index) => (
               <div
                 key={entry.id}
-                className="flex items-center gap-3 rounded-xl bg-white/7 p-3"
+                className="animate-rise-in flex items-center gap-3 rounded-xl bg-white/7 p-3 transition duration-300 hover:-translate-y-0.5 hover:bg-white/10"
+                style={{ animationDelay: `${index * 90 + 180}ms` }}
               >
-                <span className="size-2 rounded-full bg-[#d8ff62]" />
+                <span className="animate-presence size-2 rounded-full bg-[#d8ff62]" />
                 <div className="flex-1">
                   <p className="text-sm font-medium">{entry.employee_name}</p>
                   <p className="text-xs text-white/45">

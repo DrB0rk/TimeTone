@@ -1,4 +1,4 @@
-import { getFilteredEntries, getSettings } from "@/lib/db";
+import { getDeviceEvents, getFilteredEntries, getSettings } from "@/lib/db";
 import { durationMinutes, roundDuration } from "@/lib/domain";
 
 function csv(value: unknown) { return `"${String(value ?? "").replaceAll('"', '""')}"`; }
@@ -13,11 +13,25 @@ export function GET(request: Request) {
     ? url.searchParams.get("status") as "open" | "closed"
     : undefined;
   const source = url.searchParams.get("source") || undefined;
-  const exportType = url.searchParams.get("type") === "summary" ? "summary" : "entries";
+  const requested = url.searchParams.get("type");
+  const exportType = requested === "summary" || requested === "daily" || requested === "events" ? requested : "entries";
   const entries = getFilteredEntries({ from, to, employeeId, status, source });
   const lines: string[] = [];
 
-  if (exportType === "summary") {
+  if (exportType === "events") {
+    lines.push(["Event ID", "Terminal", "Employee", "Type", "Terminal time", "Received time"].map(csv).join(","));
+    for (const event of getDeviceEvents({ deviceId: url.searchParams.get("device") || undefined, employeeId })) lines.push([event.id, event.device_name, event.employee_name, event.event_type, event.occurred_at, event.received_at].map(csv).join(","));
+  } else if (exportType === "daily") {
+    lines.push(["Date", "Employee", "Sessions", "Exact minutes", "Rounded minutes", "Exact hours", "Rounded hours"].map(csv).join(","));
+    const daily = new Map<string, { sessions: number; exact: number; rounded: number }>();
+    for (const entry of entries) {
+      const exact = durationMinutes(entry.clock_in, entry.clock_out), rounded = roundDuration(exact, Number(settings.rounding_minutes), settings.rounding_mode);
+      const key = `${entry.clock_in.slice(0, 10)}|${entry.employee_name}`;
+      const row = daily.get(key) || { sessions: 0, exact: 0, rounded: 0 };
+      row.sessions++; row.exact += exact; row.rounded += rounded; daily.set(key, row);
+    }
+    for (const [key, row] of daily) { const [date, employee] = key.split("|"); lines.push([date, employee, row.sessions, row.exact, row.rounded, (row.exact / 60).toFixed(2), (row.rounded / 60).toFixed(2)].map(csv).join(",")); }
+  } else if (exportType === "summary") {
     lines.push(["Employee", "Sessions", "Open sessions", "Exact minutes", "Rounded minutes", "Exact hours", "Rounded hours"].map(csv).join(","));
     const summary = new Map<string, { sessions: number; open: number; exact: number; rounded: number }>();
     for (const entry of entries) {
