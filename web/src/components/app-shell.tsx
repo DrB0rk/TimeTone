@@ -36,9 +36,9 @@ export function AppShell(
   useEffect(() => {
     const saved = localStorage.getItem("timekeep-theme");
     const enabled = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.classList.toggle("dark", enabled);
+    document.documentElement.classList.toggle("dark", enabled); document.documentElement.style.colorScheme = enabled ? "dark" : "light";
   }, []);
-  const toggleTheme = () => { const next = !document.documentElement.classList.contains("dark"); setDark(next); localStorage.setItem("timekeep-theme", next ? "dark" : "light"); document.documentElement.classList.toggle("dark", next); };
+  const toggleTheme = () => { const next = !document.documentElement.classList.contains("dark"); setDark(next); localStorage.setItem("timekeep-theme", next ? "dark" : "light"); document.documentElement.classList.toggle("dark", next); document.documentElement.style.colorScheme = next ? "dark" : "light"; };
   return (
     <div className="min-h-screen bg-[#f5f6f2] text-[#17211b] transition-colors duration-500 dark:bg-[#101712] dark:text-[#edf5ee]">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col bg-[#17211b] text-white lg:flex">

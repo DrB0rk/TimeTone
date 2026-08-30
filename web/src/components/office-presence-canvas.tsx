@@ -33,10 +33,14 @@ export function OfficePresenceCanvas({ people }: { people: Person[] }) {
       }
       frame = requestAnimationFrame(render);
     };
-    const pointer = (event: PointerEvent) => { const rect = canvas.getBoundingClientRect(); const x = event.clientX - rect.left, y = event.clientY - rect.top; for (const node of nodes) { const dx = node.x - x, dy = node.y - y, distance = Math.max(1, Math.hypot(dx, dy)); if (distance < 110) { node.vx += dx / distance * .9; node.vy += dy / distance * .9; } } };
-    const observer = new ResizeObserver(resize); observer.observe(canvas); resize(); render(); canvas.addEventListener("pointermove", pointer);
-    return () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener("pointermove", pointer); };
+    let dragging: Node | null = null, lastX = 0, lastY = 0;
+    const point = (event: PointerEvent) => { const rect = canvas.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; };
+    const pointerDown = (event: PointerEvent) => { const { x, y } = point(event); dragging = nodes.find((node) => Math.hypot(node.x - x, node.y - y) <= node.r + 10) || null; if (dragging) { lastX = x; lastY = y; canvas.setPointerCapture(event.pointerId); } };
+    const pointerMove = (event: PointerEvent) => { if (!dragging) return; const { x, y } = point(event); dragging.vx = (x - lastX) * .35; dragging.vy = (y - lastY) * .35; dragging.x = x; dragging.y = y; lastX = x; lastY = y; };
+    const pointerUp = (event: PointerEvent) => { if (dragging) canvas.releasePointerCapture(event.pointerId); dragging = null; };
+    const observer = new ResizeObserver(resize); observer.observe(canvas); resize(); render(); canvas.addEventListener("pointerdown", pointerDown); canvas.addEventListener("pointermove", pointerMove); canvas.addEventListener("pointerup", pointerUp); canvas.addEventListener("pointercancel", pointerUp);
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener("pointerdown", pointerDown); canvas.removeEventListener("pointermove", pointerMove); canvas.removeEventListener("pointerup", pointerUp); canvas.removeEventListener("pointercancel", pointerUp); };
   }, [people]);
   if (!people.length) return <div className="grid h-56 place-items-center rounded-2xl border border-dashed border-white/15 text-center text-sm text-white/45">The nodes come alive when someone checks in.</div>;
-  return <canvas ref={canvasRef} aria-label="Interactive office presence map" className="mt-5 h-56 w-full cursor-crosshair rounded-2xl bg-[#0e1610]" />;
+  return <canvas ref={canvasRef} aria-label="Interactive office presence map; drag a person to move them" className="mt-5 h-56 w-full cursor-grab rounded-2xl bg-[#0e1610] active:cursor-grabbing" />;
 }

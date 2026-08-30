@@ -19,7 +19,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script
+          // Runs before the page is painted, preventing a light-mode flash
+          // when a visitor has previously selected dark mode.
+          dangerouslySetInnerHTML={{ __html: `(function(){try{var saved=localStorage.getItem('timekeep-theme');var dark=saved?saved==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',dark);document.documentElement.style.colorScheme=dark?'dark':'light'}catch(e){}})()` }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );
