@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
-#include "esp_lcd_ili9341.h"
+#include "esp_lcd_panel_st7789.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_touch_xpt2046.h"
@@ -22,18 +22,15 @@
 
 static const char *TAG = "display";
 #define LCD_HOST SPI2_HOST
-#define TOUCH_HOST SPI3_HOST
 #define PIN_LCD_SCLK 14
 #define PIN_LCD_MOSI 13
 #define PIN_LCD_MISO 12
 #define PIN_LCD_CS 15
 #define PIN_LCD_DC 2
 #define PIN_LCD_RST -1
-#define PIN_LCD_BL 21
-#define PIN_TOUCH_SCLK 25
-#define PIN_TOUCH_MOSI 32
-#define PIN_TOUCH_MISO 39
+#define PIN_LCD_BL 27
 #define PIN_TOUCH_CS 33
+#define PIN_TOUCH_IRQ 36
 #define H_RES 320
 #define V_RES 240
 
@@ -166,9 +163,11 @@ esp_err_t tk_display_init(void)
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &io_config, &io));
     esp_lcd_panel_dev_config_t panel_config = { .reset_gpio_num = PIN_LCD_RST, .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR, .bits_per_pixel = 16 };
     esp_lcd_panel_handle_t panel;
-    ESP_ERROR_CHECK(esp_lcd_new_panel_ili9341(io, &panel_config, &panel));
+    ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io, &panel_config, &panel));
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel)); ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel, true)); ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel, true, false)); ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
+    // The S032 uses a 3.2in ST7789 IPS panel: native 240x320, rotated into
+    // 320x240 landscape. ST7789 panels on this board require inversion.
+    ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel, true)); ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel, true)); ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel, true, false)); ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
     lv_init();
     s_display = lv_display_create(H_RES, V_RES);
     size_t buffer_size = H_RES * 30 * sizeof(lv_color16_t);
@@ -178,11 +177,11 @@ esp_err_t tk_display_init(void)
     lv_display_set_user_data(s_display, panel); lv_display_set_color_format(s_display, LV_COLOR_FORMAT_RGB565); lv_display_set_flush_cb(s_display, flush_cb);
     esp_lcd_panel_io_callbacks_t callbacks = { .on_color_trans_done = flush_done };
     ESP_ERROR_CHECK(esp_lcd_panel_io_register_event_callbacks(io, &callbacks, s_display));
-    spi_bus_config_t touch_bus = { .sclk_io_num = PIN_TOUCH_SCLK, .mosi_io_num = PIN_TOUCH_MOSI, .miso_io_num = PIN_TOUCH_MISO, .quadwp_io_num = -1, .quadhd_io_num = -1, .max_transfer_sz = 64 };
-    ESP_ERROR_CHECK(spi_bus_initialize(TOUCH_HOST, &touch_bus, SPI_DMA_CH_AUTO));
+    // S032's XPT2046 shares the LCD SPI pins (CS 33, IRQ 36). The LCD is
+    // write-only, but GPIO12 remains on the bus as touch MISO.
     esp_lcd_panel_io_spi_config_t touch_io_config = ESP_LCD_TOUCH_IO_SPI_XPT2046_CONFIG(PIN_TOUCH_CS);
-    esp_lcd_panel_io_handle_t touch_io; ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)TOUCH_HOST, &touch_io_config, &touch_io));
-    esp_lcd_touch_config_t touch_config = { .x_max = H_RES, .y_max = V_RES, .rst_gpio_num = -1, .int_gpio_num = -1, .flags = { .swap_xy = 1, .mirror_x = 0, .mirror_y = 1 } };
+    esp_lcd_panel_io_handle_t touch_io; ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &touch_io_config, &touch_io));
+    esp_lcd_touch_config_t touch_config = { .x_max = H_RES, .y_max = V_RES, .rst_gpio_num = -1, .int_gpio_num = PIN_TOUCH_IRQ, .flags = { .swap_xy = 1, .mirror_x = 0, .mirror_y = 0 } };
     esp_lcd_touch_handle_t touch; ESP_ERROR_CHECK(esp_lcd_touch_new_spi_xpt2046(touch_io, &touch_config, &touch));
     lv_indev_t *indev = lv_indev_create(); lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); lv_indev_set_display(indev, s_display); lv_indev_set_user_data(indev, touch); lv_indev_set_read_cb(indev, touch_cb);
     const esp_timer_create_args_t tick_args = { .callback = tick_cb, .name = "lvgl_tick" };

@@ -1,7 +1,10 @@
 # ESP Timekeep firmware
 
-ESP-IDF 6 firmware for the ESP32-2432S028R CYD. It uses LVGL 9.3, the ILI9341
+ESP-IDF 6 firmware for the ESP32-2432S032 CYD. It uses LVGL 9.3, the ST7789
 LCD driver, and the XPT2046 touch controller.
+
+The S032's 3.2in ST7789 is a 240x320 panel rotated to 320x240 landscape. Its
+backlight is GPIO27 and its XPT2046 shares the LCD SPI bus (CS33, IRQ36).
 
 ```bash
 source /home/drb0rk/.espressif/v6.0.1/esp-idf/export.sh
