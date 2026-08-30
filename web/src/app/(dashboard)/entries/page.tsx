@@ -92,7 +92,8 @@ export default function EntriesPage() {
                         <div
                           id={`edit-entry-${entry.id}`}
                           popover="auto"
-                          className="fixed inset-0 m-auto w-[min(21rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-white p-4 text-left shadow-xl shadow-black/10"
+                          className="fixed inset-0 m-auto max-h-[calc(100vh-2rem)] w-[min(21rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-black/10 bg-white p-4 text-left shadow-xl shadow-black/10"
+                          style={{ margin: "auto" }}
                         >
                             <div className="mb-3">
                               <p className="text-sm font-semibold">Edit time entry</p>
