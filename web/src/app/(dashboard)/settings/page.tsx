@@ -1,13 +1,16 @@
-import { Save } from "lucide-react";
-import { saveSettings } from "@/app/actions";
+import { KeyRound, Save } from "lucide-react";
+import { changePassword, saveSettings } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getSettings } from "@/lib/db";
 
-export default function SettingsPage() {
+export default async function SettingsPage(
+  { searchParams }: { searchParams: Promise<{ password?: string }> },
+) {
   const settings = getSettings();
+  const { password } = await searchParams;
   return (
     <>
       <PageHeading
@@ -64,6 +67,21 @@ export default function SettingsPage() {
           </Button>
         </div>
       </form>
+      <section className="mt-6 max-w-2xl rounded-2xl border border-black/6 bg-white p-6">
+        <div className="mb-5 flex items-start gap-3">
+          <span className="grid size-10 place-items-center rounded-xl bg-[#eef4e4] text-[#526b38]"><KeyRound className="size-5" /></span>
+          <div><h2 className="font-semibold">Admin password</h2><p className="mt-1 text-sm text-black/50">Change the password used to sign in to this dashboard.</p></div>
+        </div>
+        {password === "changed" && <p className="mb-4 rounded-lg bg-[#e8f5e9] px-3 py-2 text-sm text-[#216e39]">Password updated.</p>}
+        {password === "incorrect" && <p className="mb-4 rounded-lg bg-[#fff0ef] px-3 py-2 text-sm text-[#b42318]">Current password is not correct.</p>}
+        {password === "invalid" && <p className="mb-4 rounded-lg bg-[#fff0ef] px-3 py-2 text-sm text-[#b42318]">Use a new password of 8–128 characters and enter it twice.</p>}
+        <form action={changePassword} className="space-y-4">
+          <Field label="Current password" name="current_password" type="password" autoComplete="current-password" />
+          <Field label="New password" name="new_password" type="password" autoComplete="new-password" description="At least 8 characters." />
+          <Field label="Confirm new password" name="confirm_password" type="password" autoComplete="new-password" />
+          <Button type="submit" variant="outline"><KeyRound className="size-4" />Change password</Button>
+        </form>
+      </section>
     </>
   );
 }

@@ -83,12 +83,12 @@ static esp_err_t fetch_config(void)
         if (state->employee_count >= TK_MAX_EMPLOYEES) break;
         cJSON *id = cJSON_GetObjectItem(item, "id"), *name = cJSON_GetObjectItem(item, "name");
         cJSON *digest = cJSON_GetObjectItem(item, "codeDigest"), *clocked = cJSON_GetObjectItem(item, "clockedIn");
-        if (!cJSON_IsString(id) || !cJSON_IsString(name) || !cJSON_IsString(digest)) continue;
+        if (!cJSON_IsString(id) || !cJSON_IsString(name)) continue;
         tk_employee_t *employee = &state->employees[state->employee_count++];
         memset(employee, 0, sizeof(*employee));
         strlcpy(employee->id, id->valuestring, sizeof(employee->id));
         strlcpy(employee->name, name->valuestring, sizeof(employee->name));
-        strlcpy(employee->code_digest, digest->valuestring, sizeof(employee->code_digest));
+        if (cJSON_IsString(digest)) strlcpy(employee->code_digest, digest->valuestring, sizeof(employee->code_digest));
         employee->clocked_in = cJSON_IsTrue(clocked);
     }
     esp_err_t err = tk_state_save();
@@ -96,6 +96,25 @@ static esp_err_t fetch_config(void)
     cJSON_Delete(root);
     tk_display_refresh();
     return err;
+}
+
+esp_err_t tk_api_submit_code(const char *code, char employee_name[48], bool *clocked_in)
+{
+    char body[96];
+    snprintf(body, sizeof(body), "{\"code\":\"%s\"}", code);
+    char response[512];
+    int status = request("/api/device/v1/clock", HTTP_METHOD_POST, body, response, sizeof(response));
+    if (status == 404) return ESP_ERR_NOT_FOUND;
+    if (status == 401) return ESP_ERR_INVALID_STATE;
+    if (status != 200) return ESP_FAIL;
+    cJSON *root = cJSON_Parse(response);
+    if (!root) return ESP_ERR_INVALID_RESPONSE;
+    cJSON *name = cJSON_GetObjectItem(root, "employeeName"), *clocked = cJSON_GetObjectItem(root, "clockedIn");
+    if (!cJSON_IsString(name) || !cJSON_IsBool(clocked)) { cJSON_Delete(root); return ESP_ERR_INVALID_RESPONSE; }
+    strlcpy(employee_name, name->valuestring, 48);
+    *clocked_in = cJSON_IsTrue(clocked);
+    cJSON_Delete(root);
+    return ESP_OK;
 }
 
 static esp_err_t push_events(void)
@@ -153,15 +172,16 @@ static void heartbeat(void)
 
 static void api_task(void *argument)
 {
-    int cycle = 0;
     while (true) {
         if (tk_network_connected() && tk_config_get()->configured) {
             tk_display_set_online(true);
-            if (cycle % 5 == 0) fetch_config();
+            // Keep the terminal's employee list fresh while the server is
+            // being configured, and after an administrator approves pairing.
+            // The response is small and this avoids a long stale-PIN window.
+            fetch_config();
             push_events();
             heartbeat();
-            cycle++;
-        } else tk_display_set_online(false);
+        }
         xSemaphoreTake(s_wake, pdMS_TO_TICKS(30000));
     }
 }

@@ -77,9 +77,7 @@ export default async function LoginPage(
             </Button>
           </form>
           <p className="mt-6 text-xs leading-5 text-black/35">
-            For the local demo, use{" "}
-            <code className="rounded bg-black/5 px-1.5 py-0.5">timekeep</code>.
-            Set ADMIN_PASSWORD before deployment.
+            Use the administrator password configured for this Timekeep server.
           </p>
         </div>
       </section>

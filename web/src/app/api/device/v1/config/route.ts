@@ -22,7 +22,6 @@ export function GET(request: Request) {
     employees: getEmployees(false).map((employee) => ({
       id: employee.id,
       name: employee.name,
-      codeDigest: employee.code_digest,
       clockedIn: open.has(employee.id),
     })),
   }, { headers: { "Cache-Control": "no-store" } });

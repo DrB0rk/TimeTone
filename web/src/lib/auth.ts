@@ -1,11 +1,29 @@
 import { jwtVerify, SignJWT } from "jose";
+import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { db, sha256 } from "@/lib/db";
 
 const secret = new TextEncoder().encode(
   process.env.ADMIN_SECRET || "development-secret-change-me",
 );
 export const SESSION_COOKIE = "timekeep_session";
+
+function passwordDigest() {
+  return (db.prepare("SELECT value FROM settings WHERE key = 'admin_password_digest'").get() as { value: string } | undefined)?.value;
+}
+
+export function verifyAdminPassword(password: string) {
+  const stored = passwordDigest();
+  if (stored) return cryptoSafeEqual(sha256(password), stored);
+  return cryptoSafeEqual(password, process.env.ADMIN_PASSWORD || "timekeep");
+}
+
+function cryptoSafeEqual(a: string, b: string) {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
 
 export async function createSession() {
   return new SignJWT({ role: "admin" })

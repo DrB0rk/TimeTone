@@ -31,14 +31,15 @@ On a factory-fresh terminal, join the `ESP-Timekeep-XXXX` Wi-Fi network with
 password `timekeep`, open `http://192.168.4.1`, and enter Wi-Fi plus the server
 URL. The terminal creates its own credential and appears in the dashboard for
 approval. The local demo dashboard password is `timekeep`; employee
-Alex Morgan uses PIN `1234`. Change every demo credential before deployment.
+Demo records are disabled by default. Create employees and their color
+sequences from the web UI before using a terminal.
 
 See [Getting started](docs/GETTING_STARTED.md), [hardware](docs/HARDWARE.md),
 [deployment](docs/DEPLOYMENT.md), and the [device API](docs/API.md).
 
 ## Current product features
 
-- Touchscreen PIN clock-in/out with clear employee feedback
+- Four-color touchscreen clock-in/out with clear employee feedback
 - Offline employee cache and a persistent 48-event sync queue
 - Wi-Fi setup portal plus automatic fallback access point
 - HTTPS device API, per-device bearer tokens, idempotent events, and heartbeat

@@ -19,7 +19,8 @@ npm run dev
 ```
 
 Open `http://localhost:3000`. The development defaults are admin password
-`timekeep`, device token `dev-device-token`, and employee PIN `1234`.
+The server starts without demo employees or devices. Add an employee and choose
+a color sequence in **Employees**, then approve the terminal in **Devices**.
 
 ## 2. Build and flash the terminal
 
@@ -49,7 +50,7 @@ If the saved Wi-Fi is unavailable for 20 seconds, the setup network returns.
 
 ## 4. Clock time
 
-Enter a 4–8 digit PIN and tap **OK**. The same action toggles between clock-in
+Choose a 4–8 color sequence and tap **DONE**. The same action toggles between clock-in
 and clock-out. The event is stored before sync, so a short server or Wi-Fi
 outage does not lose it. The dashboard calculates rounded time per completed
 session while retaining exact timestamps.
@@ -65,4 +66,3 @@ npm run build
 cd ../firmware
 idf.py build
 ```
-

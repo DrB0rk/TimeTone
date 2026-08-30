@@ -96,7 +96,7 @@ static void update_pin_label(void)
 {
     char hidden[9] = {0};
     for (size_t i = 0; i < strlen(s_pin); ++i) hidden[i] = '*';
-    lv_label_set_text(s_pin_label, hidden[0] ? hidden : "Enter your PIN");
+    lv_label_set_text(s_pin_label, hidden[0] ? hidden : "Choose your colors");
     lv_obj_set_style_text_color(s_pin_label, lv_color_hex(hidden[0] ? 0x17211B : 0x788078), 0);
 }
 
@@ -106,18 +106,15 @@ static void handle_keypress(const char *text)
     if (strcmp(text, "<") == 0) {
         size_t length = strlen(s_pin); if (length) s_pin[length - 1] = 0;
     } else if (strcmp(text, "OK") == 0) {
-        const tk_employee_t *employee = tk_find_employee_by_code(s_pin);
-        if (!employee) set_status("PIN not recognised — try again", 0xC43D3D);
+        if (strlen(s_pin) < 4) set_status("Choose at least 4 colors", 0xC47B24);
         else {
-            bool clocked_in;
-            esp_err_t err = tk_toggle_employee(employee->id, NULL, &clocked_in);
-            if (err == ESP_ERR_INVALID_STATE) set_status("Waiting for a valid time — connect Wi-Fi", 0xC47B24);
-            else if (err == ESP_ERR_NO_MEM) set_status("Offline queue full — connect Wi-Fi", 0xC43D3D);
+            char employee_name[48]; bool clocked_in = false;
+            esp_err_t err = tk_api_submit_code(s_pin, employee_name, &clocked_in);
+            if (err == ESP_ERR_NOT_FOUND) set_status("Code not recognised — try again", 0xC43D3D);
+            else if (err == ESP_ERR_INVALID_STATE || err == ESP_FAIL) set_status("Offline — connect to clock in", 0xC47B24);
             else if (err == ESP_OK) {
-                char message[96];
-                snprintf(message, sizeof(message), "%s, %s!", clocked_in ? "Welcome" : "Goodbye", employee->name);
+                char message[96]; snprintf(message, sizeof(message), "%s, %s!", clocked_in ? "Welcome" : "Goodbye", employee_name);
                 set_status(message, clocked_in ? 0x168455 : 0x526159);
-                tk_api_wake();
             }
         }
         s_pin[0] = 0;
@@ -151,13 +148,19 @@ static void build_clock_ui(void)
     lv_obj_t *prompt = lv_label_create(s_main_screen); lv_label_set_text(prompt, "Clock in or out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(0x17211B), 0); lv_obj_set_pos(prompt, 14, 55);
     s_pin_label = lv_label_create(s_main_screen); lv_obj_set_size(s_pin_label, 212, 38); lv_obj_set_style_bg_color(s_pin_label, lv_color_white(), 0); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_COVER, 0); lv_obj_set_style_border_width(s_pin_label, 1, 0); lv_obj_set_style_border_color(s_pin_label, lv_color_hex(0xD4D8D1), 0); lv_obj_set_style_radius(s_pin_label, 10, 0); lv_obj_set_style_pad_left(s_pin_label, 12, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 14, 78);
     s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 30); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_WRAP); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 120);
-    s_keypad = lv_obj_create(s_main_screen); lv_obj_remove_style_all(s_keypad); lv_obj_set_size(s_keypad, 212, 144); lv_obj_set_pos(s_keypad, 14, 157);
-    static const char *keys[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "<", "0", "OK" };
-    for (int i = 0; i < 12; ++i) {
+    s_keypad = lv_obj_create(s_main_screen); lv_obj_remove_style_all(s_keypad); lv_obj_set_size(s_keypad, 212, 148); lv_obj_set_pos(s_keypad, 14, 157);
+    static const char *keys[] = { "A", "B", "C", "D", "<", "OK" };
+    static const uint32_t colors[] = { 0xEF6F61, 0x3D8BFD, 0x9ACB3C, 0x9B72CF, 0xFFFFFF, 0xD8FF62 };
+    static const char *labels[] = { "CORAL", "OCEAN", "LIME", "VIOLET", "BACK", "DONE" };
+    for (int i = 0; i < 6; ++i) {
         lv_obj_t *button = lv_button_create(s_keypad);
-        lv_obj_set_size(button, 64, 30); lv_obj_set_pos(button, (i % 3) * 74, (i / 3) * 37);
-        lv_obj_set_style_bg_color(button, lv_color_white(), 0); lv_obj_set_style_bg_color(button, lv_color_hex(0xD8FF62), LV_STATE_PRESSED); lv_obj_set_style_text_color(button, lv_color_hex(0x17211B), 0); lv_obj_set_style_text_font(button, &lv_font_montserrat_14, 0); lv_obj_set_style_radius(button, 9, 0); lv_obj_set_style_border_width(button, 1, 0); lv_obj_set_style_border_color(button, lv_color_hex(0xC8CEC7), 0); lv_obj_set_style_shadow_width(button, 3, 0); lv_obj_set_style_shadow_opa(button, LV_OPA_20, 0); lv_obj_add_event_cb(button, keypad_button_event, LV_EVENT_CLICKED, (void *)keys[i]);
-        lv_obj_t *label = lv_label_create(button); lv_label_set_text(label, keys[i]); lv_obj_center(label);
+        if (i < 4) {
+            lv_obj_set_size(button, 100, 56); lv_obj_set_pos(button, (i % 2) * 112, (i / 2) * 58);
+        } else {
+            lv_obj_set_size(button, 100, 28); lv_obj_set_pos(button, (i - 4) * 112, 120);
+        }
+        lv_obj_set_style_bg_color(button, lv_color_hex(colors[i]), 0); lv_obj_set_style_bg_color(button, lv_color_hex(0xFFFFFF), LV_STATE_PRESSED); lv_obj_set_style_text_color(button, lv_color_hex(0x17211B), 0); lv_obj_set_style_text_font(button, &lv_font_montserrat_14, 0); lv_obj_set_style_radius(button, 12, 0); lv_obj_set_style_border_width(button, 1, 0); lv_obj_set_style_border_color(button, lv_color_hex(0xC8CEC7), 0); lv_obj_set_style_shadow_width(button, 3, 0); lv_obj_set_style_shadow_opa(button, LV_OPA_20, 0); lv_obj_add_event_cb(button, keypad_button_event, LV_EVENT_CLICKED, (void *)keys[i]);
+        lv_obj_t *label = lv_label_create(button); lv_label_set_text(label, labels[i]); lv_obj_center(label);
     }
     s_count_label = lv_label_create(s_main_screen); lv_obj_set_style_text_color(s_count_label, lv_color_hex(0x788078), 0); lv_obj_set_style_text_font(s_count_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_count_label, 14, 304);
     set_status("Ready", 0x168455); update_pin_label();
@@ -207,7 +210,9 @@ esp_err_t tk_display_init(void)
     ESP_ERROR_CHECK(spi_bus_initialize(TOUCH_HOST, &touch_bus, SPI_DMA_CH_AUTO));
     esp_lcd_panel_io_spi_config_t touch_io_config = ESP_LCD_TOUCH_IO_SPI_XPT2046_CONFIG(PIN_TOUCH_CS);
     esp_lcd_panel_io_handle_t touch_io; ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)TOUCH_HOST, &touch_io_config, &touch_io));
-    esp_lcd_touch_config_t touch_config = { .x_max = H_RES, .y_max = V_RES, .rst_gpio_num = -1, .int_gpio_num = PIN_TOUCH_IRQ, .flags = { .swap_xy = 0, .mirror_x = 0, .mirror_y = 0 } };
+    // Portrait panel coordinates are correct except for the resistive layer's
+    // left/right orientation on this board revision.
+    esp_lcd_touch_config_t touch_config = { .x_max = H_RES, .y_max = V_RES, .rst_gpio_num = -1, .int_gpio_num = PIN_TOUCH_IRQ, .flags = { .swap_xy = 0, .mirror_x = 1, .mirror_y = 0 } };
     esp_lcd_touch_handle_t touch; ESP_ERROR_CHECK(esp_lcd_touch_new_spi_xpt2046(touch_io, &touch_config, &touch));
     lv_indev_t *indev = lv_indev_create(); lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); lv_indev_set_display(indev, s_display); lv_indev_set_user_data(indev, touch); lv_indev_set_read_cb(indev, touch_cb);
     const esp_timer_create_args_t tick_args = { .callback = tick_cb, .name = "lvgl_tick" };
@@ -222,6 +227,7 @@ esp_err_t tk_display_init(void)
 void tk_display_set_online(bool online)
 {
     if (!s_status_label || !s_setup_screen) return;
+    if (online == s_online) return;
     s_online = online; _lock_acquire(&s_lvgl_lock);
     if (online) {
         lv_obj_clear_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);

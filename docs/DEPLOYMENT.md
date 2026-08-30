@@ -30,7 +30,8 @@ Copy the backup out of the volume and test restoration periodically.
 
 ## Security checklist
 
-- Replace development admin password, session secret, device token, and PIN.
+- Replace the development admin password and session secret. Employee color
+  sequences are created in the protected web UI.
 - Give each physical terminal a different random token.
 - Terminate TLS before exposing the app or configuring an ESP.
 - Restrict dashboard access with a VPN or identity-aware proxy when practical.

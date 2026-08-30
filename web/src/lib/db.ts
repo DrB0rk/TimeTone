@@ -207,4 +207,6 @@ export function seedDevelopmentData() {
   );
 }
 
-seedDevelopmentData();
+// Demo records are opt-in so a production/LAN instance always starts clean.
+// Set SEED_DEMO_DATA=true only when explicitly building a development fixture.
+if (process.env.SEED_DEMO_DATA === "true") seedDevelopmentData();

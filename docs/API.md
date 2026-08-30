@@ -15,8 +15,14 @@ endpoints accept that credential.
 ## `GET /api/device/v1/config`
 
 Returns server time, workspace settings, device identity, and active employees.
-Employee PINs are returned only as SHA-256 digests so the terminal can validate
-offline without storing plaintext PINs.
+Employee names and clock state are returned for display only. Access codes stay
+on the server; the terminal submits a color sequence to the clock endpoint.
+
+## `POST /api/device/v1/clock`
+
+Accepts `{ "code": "ABCD" }` (4–8 color keys using A, B, C, or D). The server
+validates the sequence and toggles that employee's current time entry. A
+successful response includes `employeeName`, `clockedIn`, and `occurredAt`.
 
 ## `POST /api/device/v1/events`
 

@@ -1,5 +1,6 @@
 import { UserPlus } from "lucide-react";
 import { createEmployee, toggleEmployee } from "@/app/actions";
+import { ColorCodeInput } from "@/components/color-code-input";
 import { PageHeading } from "@/components/page-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ export default function EmployeesPage() {
       <PageHeading
         eyebrow="Team directory"
         title="Employees"
-        description="Manage who can use the clock. PINs are one-way hashed and are never shown again."
+        description="Manage who can use the clock. Each person gets a private sequence of four colors."
       />
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <div className="overflow-hidden rounded-2xl border border-black/6 bg-white">
@@ -94,14 +95,11 @@ export default function EmployeesPage() {
                 placeholder="sam@company.com"
               />
               <Field label="Role" name="role" placeholder="Product designer" />
-              <Field
-                label="PIN (4–8 digits)"
-                name="code"
-                inputMode="numeric"
-                pattern="[0-9]{4,8}"
-                placeholder="••••"
-                required
-              />
+              <div className="space-y-2">
+                <Label>Color passcode (4–8 keys)</Label>
+                <ColorCodeInput name="code" />
+                <p className="text-xs text-black/40">Choose a sequence employees can remember. It is stored securely and never shown again.</p>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="color">Badge colour</Label>
                 <Input

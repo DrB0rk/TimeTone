@@ -5,23 +5,20 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createSession, requireAuth, SESSION_COOKIE } from "@/lib/auth";
+import { createSession, requireAuth, SESSION_COOKIE, verifyAdminPassword } from "@/lib/auth";
 import { db, sha256 } from "@/lib/db";
 
 const employeeSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email: z.string().trim().email().or(z.literal("")),
   role: z.string().trim().max(80),
-  code: z.string().regex(/^\d{4,8}$/),
+  code: z.string().regex(/^[ABCD]{4,8}$/),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
 });
 
 export async function login(formData: FormData) {
   const password = String(formData.get("password") || "");
-  const expected = process.env.ADMIN_PASSWORD || "timekeep";
-  const a = Buffer.from(password);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+  if (!verifyAdminPassword(password)) {
     redirect("/login?error=1");
   }
   const store = await cookies();
@@ -107,6 +104,20 @@ export async function saveSettings(formData: FormData) {
   )();
   revalidatePath("/");
   revalidatePath("/settings");
+}
+
+export async function changePassword(formData: FormData) {
+  await requireAuth();
+  const current = String(formData.get("current_password") || "");
+  const next = String(formData.get("new_password") || "");
+  const confirmation = String(formData.get("confirm_password") || "");
+  if (!verifyAdminPassword(current)) redirect("/settings?password=incorrect");
+  if (next.length < 8 || next.length > 128 || next !== confirmation) {
+    redirect("/settings?password=invalid");
+  }
+  db.prepare("INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .run("admin_password_digest", sha256(next));
+  redirect("/settings?password=changed");
 }
 
 export async function addManualEntry(formData: FormData) {
