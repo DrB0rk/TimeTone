@@ -29,6 +29,10 @@ static const char *TAG = "display";
 #define PIN_LCD_DC 2
 #define PIN_LCD_RST -1
 #define PIN_LCD_BL 27
+// Some S032 production runs route the backlight enable to GPIO21 (the
+// connected unit did so with the previous firmware); GPIO27 is used by the
+// other S032/ST7789 run. Drive both harmless control nets for compatibility.
+#define PIN_LCD_BL_ALT 21
 #define PIN_TOUCH_CS 33
 #define PIN_TOUCH_IRQ 36
 #define H_RES 320
@@ -154,8 +158,8 @@ static void build_clock_ui(void)
 
 esp_err_t tk_display_init(void)
 {
-    gpio_config_t backlight = { .pin_bit_mask = 1ULL << PIN_LCD_BL, .mode = GPIO_MODE_OUTPUT };
-    ESP_ERROR_CHECK(gpio_config(&backlight)); gpio_set_level(PIN_LCD_BL, 0);
+    gpio_config_t backlight = { .pin_bit_mask = (1ULL << PIN_LCD_BL) | (1ULL << PIN_LCD_BL_ALT), .mode = GPIO_MODE_OUTPUT };
+    ESP_ERROR_CHECK(gpio_config(&backlight)); gpio_set_level(PIN_LCD_BL, 0); gpio_set_level(PIN_LCD_BL_ALT, 0);
     spi_bus_config_t lcd_bus = { .sclk_io_num = PIN_LCD_SCLK, .mosi_io_num = PIN_LCD_MOSI, .miso_io_num = PIN_LCD_MISO, .quadwp_io_num = -1, .quadhd_io_num = -1, .max_transfer_sz = H_RES * 40 * 2 };
     ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &lcd_bus, SPI_DMA_CH_AUTO));
     esp_lcd_panel_io_spi_config_t io_config = { .dc_gpio_num = PIN_LCD_DC, .cs_gpio_num = PIN_LCD_CS, .pclk_hz = 40 * 1000 * 1000, .lcd_cmd_bits = 8, .lcd_param_bits = 8, .spi_mode = 0, .trans_queue_depth = 10 };
@@ -188,7 +192,7 @@ esp_err_t tk_display_init(void)
     esp_timer_handle_t timer; ESP_ERROR_CHECK(esp_timer_create(&tick_args, &timer)); ESP_ERROR_CHECK(esp_timer_start_periodic(timer, 2000));
     build_clock_ui(); tk_display_refresh();
     xTaskCreate(lvgl_task, "lvgl", 6144, NULL, 5, NULL);
-    gpio_set_level(PIN_LCD_BL, 1);
+    gpio_set_level(PIN_LCD_BL, 1); gpio_set_level(PIN_LCD_BL_ALT, 1);
     ESP_LOGI(TAG, "display initialized");
     return ESP_OK;
 }

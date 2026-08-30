@@ -14,7 +14,7 @@ firmware swaps XY for the 320×240 landscape UI and enables panel inversion.
 | LCD MISO | 12 |
 | LCD chip select | 15 |
 | LCD data/command | 2 |
-| LCD backlight | 27 |
+| LCD backlight | 27 (also drives 21 for S032 variants) |
 | Touch clock (shared LCD SPI) | 14 |
 | Touch MOSI (shared LCD SPI) | 13 |
 | Touch MISO (shared LCD SPI) | 12 |
@@ -22,7 +22,9 @@ firmware swaps XY for the 320×240 landscape UI and enables panel inversion.
 | Touch IRQ | 36 |
 
 The S032 shares one SPI bus between the write-only LCD and XPT2046 touch. The
-firmware uses landscape orientation and the S032 pinout above.
+firmware uses landscape orientation and the S032 pinout above. Backlight
+enable is driven on both GPIO27 and GPIO21 because both routings exist across
+S032 production runs.
 
 The classic ESP32 has no battery-backed real-time clock. It obtains UTC from
 NTP. It can keep correct time and queue events while Wi-Fi is down after a time
