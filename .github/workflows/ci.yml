@@ -28,4 +28,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - working-directory: firmware
-        run: idf.py build
+        run: . /opt/esp/idf/export.sh && idf.py build
