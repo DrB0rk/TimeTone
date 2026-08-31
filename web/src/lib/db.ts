@@ -114,7 +114,7 @@ const defaults = {
   auto_close_enabled: "true",
   max_shift_hours: "14",
   duplicate_window_seconds: "15",
-  default_report_window: "30",
+  default_report_window: "60",
   sync_interval_seconds: "5",
   terminal_theme: "light",
 };
@@ -125,6 +125,10 @@ const insertSetting = db.prepare(
 Object.entries(defaults).forEach(([key, value]) =>
   insertSetting.run(key, value)
 );
+// The original default was 30 days. Upgrade untouched installations to the
+// new two-month view while retaining any other explicitly selected value.
+const reportWindow = db.prepare("SELECT value FROM settings WHERE key = 'default_report_window'").get() as { value: string } | undefined;
+if (reportWindow?.value === "30") db.prepare("UPDATE settings SET value = '60' WHERE key = 'default_report_window'").run();
 
 export function sha256(value: string) {
   return crypto.createHash("sha256").update(value).digest("hex");

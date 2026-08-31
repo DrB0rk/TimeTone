@@ -140,7 +140,7 @@ export async function saveSettings(formData: FormData) {
     auto_close_enabled: z.enum(["true", "false"]).parse(formData.get("auto_close_enabled")),
     max_shift_hours: z.coerce.number().min(1).max(24).parse(formData.get("max_shift_hours")).toString(),
     duplicate_window_seconds: z.coerce.number().int().min(0).max(120).parse(formData.get("duplicate_window_seconds")).toString(),
-    default_report_window: z.enum(["7", "14", "30", "90", "365"]).parse(formData.get("default_report_window")),
+    default_report_window: z.enum(["7", "14", "30", "60", "90", "365"]).parse(formData.get("default_report_window")),
   };
   const statement = db.prepare(
     "INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",

@@ -42,7 +42,7 @@ export default async function SettingsPage(
 
         <SettingsSection icon={SlidersHorizontal} title="Reports" description="Set the default time window for reporting. Terminal-specific options live on each device card.">
           <div className="grid gap-5 sm:grid-cols-3">
-            <SelectField label="Default report window" name="default_report_window" value={settings.default_report_window} options={[["7", "7 days"], ["14", "14 days"], ["30", "30 days"], ["90", "90 days"], ["365", "12 months"]]} />
+            <SelectField label="Default report window" name="default_report_window" value={settings.default_report_window} options={[["7", "7 days"], ["14", "14 days"], ["30", "30 days"], ["60", "2 months"], ["90", "90 days"], ["365", "12 months"]]} />
           </div>
         </SettingsSection>
         <Button type="submit" size="lg" className="bg-[#17211b] text-white hover:bg-[#26352c]"><Save className="size-4" />Save workspace settings</Button>
