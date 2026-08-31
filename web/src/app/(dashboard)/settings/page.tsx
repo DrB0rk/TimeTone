@@ -7,10 +7,10 @@ import { Label } from "@/components/ui/label";
 import { getSettings } from "@/lib/db";
 
 export default async function SettingsPage(
-  { searchParams }: { searchParams: Promise<{ password?: string }> },
+  { searchParams }: { searchParams: Promise<{ password?: string; migration?: string }> },
 ) {
   const settings = getSettings();
-  const { password } = await searchParams;
+  const { password, migration } = await searchParams;
   return (
     <>
       <PageHeading eyebrow="Workspace controls" title="Settings" description="Keep attendance rules transparent, terminals responsive, and reporting consistent." />
@@ -61,6 +61,8 @@ export default async function SettingsPage(
       </SettingsSection>
 
       <SettingsSection icon={ArchiveRestore} title="Migration" description="Move employees, terminals, settings, time entries, and audit history to another TimeTone server." className="mt-6 max-w-4xl">
+        {migration === "imported" && <Notice tone="success">Migration imported successfully. All workspace data and history have been restored.</Notice>}
+        {migration && migration !== "imported" && <Notice tone="error">Migration could not be imported. Check the file and try again.</Notice>}
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-xl border border-black/8 bg-[#f5f6f2] p-4 dark:border-white/10 dark:bg-[#243127]">
             <p className="font-medium">Download a complete backup</p>

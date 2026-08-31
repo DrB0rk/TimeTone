@@ -1,6 +1,7 @@
 import { requireAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 export const runtime = "nodejs";
 
@@ -11,16 +12,16 @@ export async function POST(request: Request) {
   await requireAuth();
   const form = await request.formData();
   const file = form.get("file");
-  if (!(file instanceof File)) return Response.json({ error: "Choose a migration file." }, { status: 400 });
-  if (file.size > 25 * 1024 * 1024) return Response.json({ error: "Migration file is too large (25 MB maximum)." }, { status: 400 });
+  if (!(file instanceof File)) redirect("/settings?migration=missing");
+  if (file.size > 25 * 1024 * 1024) redirect("/settings?migration=large");
 
   let payload: { format?: unknown; version?: unknown; tables?: Record<string, unknown> };
-  try { payload = JSON.parse(await file.text()) as typeof payload; } catch { return Response.json({ error: "The migration file is not valid JSON." }, { status: 400 }); }
+  try { payload = JSON.parse(await file.text()) as typeof payload; } catch { redirect("/settings?migration=invalid"); }
   if (payload.format !== "timetone-migration" || payload.version !== 1 || !payload.tables || typeof payload.tables !== "object") {
-    return Response.json({ error: "This is not a compatible TimeTone migration file." }, { status: 400 });
+    redirect("/settings?migration=unsupported");
   }
   if (tables.some((table) => !rowArrays(payload.tables?.[table]))) {
-    return Response.json({ error: "The migration file is missing required data sections." }, { status: 400 });
+    redirect("/settings?migration=incomplete");
   }
 
   try {
@@ -38,8 +39,9 @@ export async function POST(request: Request) {
       }
     })();
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? `Import failed: ${error.message}` : "Import failed." }, { status: 400 });
+    console.error("TimeTone migration import failed", error);
+    redirect("/settings?migration=failed");
   }
   for (const path of ["/", "/employees", "/devices", "/entries", "/events", "/reports", "/settings"]) revalidatePath(path);
-  return Response.json({ ok: true });
+  redirect("/settings?migration=imported");
 }
