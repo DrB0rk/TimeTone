@@ -2,16 +2,22 @@
 
 ## Recommended install
 
-From a trusted release checkout on a Linux Docker host:
+From a trusted release checkout on a Linux host:
 
 ```bash
 ./install.sh
 ```
 
-The script creates `web/.env` with a random 256-bit session secret and starts
-the dashboard. It never sends configuration or attendance data outside your
-host. Re-run it to rebuild after pulling an update; choose to keep the existing
-configuration when prompted.
+The script is interactive by default: choose Docker or native Node.js
+installation, then provide the password, timezone, and port. It creates
+`web/.env` with a random 256-bit session secret and starts the dashboard. It
+never sends configuration or attendance data outside your host. Re-run it to
+rebuild after pulling an update; choose to keep the existing configuration when
+prompted. Native installs require Node.js 20.9+ and npm and write logs to
+`web/timetone.log`.
+
+For automation, use `./install.sh --docker --non-interactive` or
+`./install.sh --native --non-interactive` with `TIMETONE_ADMIN_PASSWORD` set.
 
 ## Docker Compose
 

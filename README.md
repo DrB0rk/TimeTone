@@ -28,8 +28,9 @@ cd TimeTone
 ./install.sh
 ```
 
-The installer creates a private `web/.env`, asks for the admin password,
-timezone and LAN port, then starts the dashboard. Open the address it prints,
+The installer is interactive by default: it asks whether to use Docker or a
+native Node.js install, then asks for the admin password, timezone and LAN
+port. It creates a private `web/.env` and starts the dashboard. Open the address it prints,
 sign in, create employees, and configure the terminal. For unattended installs:
 
 ```bash
@@ -37,6 +38,10 @@ TIMETONE_ADMIN_PASSWORD='use-a-long-unique-password' \
 TIMEKEEP_TIMEZONE='Europe/Amsterdam' TIMETONE_PORT=3000 \
 ./install.sh --non-interactive
 ```
+
+To select a mode explicitly, use `./install.sh --docker` or
+`./install.sh --native`. Native installs require Node.js 20.9+ and npm; the
+dashboard runs as a background process with logs in `web/timetone.log`.
 
 See [deployment and operations](docs/DEPLOYMENT.md) for HTTPS, backups and
 updates. An HTTPS address (or `localhost`) is required for browser USB updates
