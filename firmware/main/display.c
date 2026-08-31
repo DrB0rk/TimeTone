@@ -227,6 +227,14 @@ static void keypad_button_event(lv_event_t *event)
     handle_keypress((const char *)lv_event_get_user_data(event));
 }
 
+static void clear_keypad_event(lv_event_t *event)
+{
+    (void)event;
+    s_pin[0] = 0;
+    update_pin_label();
+    set_status("Sequence cleared", 0x526159);
+}
+
 static void clock_timer(lv_timer_t *timer)
 {
     time_t now; struct tm local;
@@ -303,7 +311,7 @@ static void build_clock_ui(void)
     lv_obj_t *prompt = lv_label_create(s_main_screen); lv_label_set_text(prompt, "Clock in or out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(fg_color()), 0); lv_obj_set_pos(prompt, 14, 55);
     s_pin_label = lv_label_create(s_main_screen); lv_obj_set_size(s_pin_label, 212, 38); lv_obj_set_style_bg_color(s_pin_label, lv_color_white(), 0); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_COVER, 0); lv_obj_set_style_border_width(s_pin_label, 1, 0); lv_obj_set_style_border_color(s_pin_label, lv_color_hex(0xD4D8D1), 0); lv_obj_set_style_radius(s_pin_label, 10, 0); lv_obj_set_style_pad_left(s_pin_label, 12, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 14, 78);
     s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 30); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_WRAP); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 120);
-    s_keypad = lv_obj_create(s_main_screen); lv_obj_remove_style_all(s_keypad); lv_obj_set_size(s_keypad, 212, 132); lv_obj_set_pos(s_keypad, 14, 153);
+    s_keypad = lv_obj_create(s_main_screen); lv_obj_remove_style_all(s_keypad); lv_obj_set_size(s_keypad, 212, 112); lv_obj_set_pos(s_keypad, 14, 149);
     // Keep this row-major order in sync with the web color picker:
     // top-left Coral (A), top-right Ocean (B), bottom-left Lime (C),
     // bottom-right Violet (D).
@@ -311,9 +319,15 @@ static void build_clock_ui(void)
     static const uint32_t colors[] = { 0xEF6F61, 0x3D8BFD, 0x9ACB3C, 0x9B72CF };
     for (int i = 0; i < 4; ++i) {
         lv_obj_t *button = lv_button_create(s_keypad);
-        lv_obj_set_size(button, 104, 64); lv_obj_set_pos(button, (i % 2) * 108, (i / 2) * 68);
+        lv_obj_set_size(button, 104, 54); lv_obj_set_pos(button, (i % 2) * 108, (i / 2) * 58);
         lv_obj_set_style_bg_color(button, lv_color_hex(colors[i]), 0); lv_obj_set_style_bg_color(button, lv_color_hex(0xFFFFFF), LV_STATE_PRESSED); lv_obj_set_style_text_color(button, lv_color_hex(0x17211B), 0); lv_obj_set_style_text_font(button, &lv_font_montserrat_14, 0); lv_obj_set_style_radius(button, 12, 0); lv_obj_set_style_border_width(button, 1, 0); lv_obj_set_style_border_color(button, lv_color_hex(0xC8CEC7), 0); lv_obj_set_style_shadow_width(button, 3, 0); lv_obj_set_style_shadow_opa(button, LV_OPA_20, 0); lv_obj_add_event_cb(button, keypad_button_event, LV_EVENT_CLICKED, (void *)keys[i]);
     }
+    lv_obj_t *clear = lv_button_create(s_main_screen);
+    lv_obj_set_size(clear, 212, 30); lv_obj_set_pos(clear, 14, 266);
+    lv_obj_set_style_bg_color(clear, lv_color_hex(0x34443A), 0); lv_obj_set_style_bg_color(clear, lv_color_hex(0xD8FF62), LV_STATE_PRESSED);
+    lv_obj_set_style_text_color(clear, lv_color_white(), 0); lv_obj_set_style_text_font(clear, &lv_font_montserrat_14, 0); lv_obj_set_style_radius(clear, 9, 0); lv_obj_set_style_border_width(clear, 0, 0);
+    lv_obj_add_event_cb(clear, clear_keypad_event, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *clear_label = lv_label_create(clear); lv_label_set_text(clear_label, "CLEAR"); lv_obj_center(clear_label);
     s_count_label = lv_label_create(s_main_screen); lv_obj_set_style_text_color(s_count_label, lv_color_hex(0x788078), 0); lv_obj_set_style_text_font(s_count_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_count_label, 14, 304);
     set_status("Ready", 0x168455); update_pin_label();
     lv_timer_create(clock_timer, 1000, NULL); clock_timer(NULL);
