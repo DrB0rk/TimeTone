@@ -7,6 +7,9 @@ FROM node:24-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Next collects server routes in parallel; keep build-time SQLite isolated from
+# runtime data and avoid concurrent initialization of the persistent volume.
+ENV DATABASE_PATH=/tmp/timetone-build.db
 RUN npm run build
 
 FROM node:24-alpine AS runner
