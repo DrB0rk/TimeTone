@@ -152,9 +152,11 @@ html.dark .employee-add-card [data-slot="card-title"], html.dark .employee-add-c
 html.dark .employee-total-track { background-color: #33463a !important; }
 .report-intensity-fill { background-color: color-mix(in srgb, #d8ff62 calc(12% + var(--heat) * 88%), #eef0eb); }
 .report-heat-cell { background-color: color-mix(in srgb, #d8ff62 calc(var(--heat) * 100%), #d9ddda); }
+.report-heat-cell-future { background: #b8bcb9; }
 .report-intensity-legend { display: inline-block; background: linear-gradient(90deg, #eef0eb, #d8ff62); }
 html.dark .report-intensity-fill { background-color: color-mix(in srgb, #d8ff62 calc(12% + var(--heat) * 88%), #26372d); }
 html.dark .report-heat-cell { background-color: color-mix(in srgb, #d8ff62 calc(var(--heat) * 100%), #353a37); }
+html.dark .report-heat-cell-future { background: #252a27; }
 html.dark .report-intensity-legend { background: linear-gradient(90deg, #353a37, #d8ff62); }
 .report-tooltip { pointer-events: none; position: absolute; z-index: 20; white-space: nowrap; border-radius: .5rem; background: #17211b; color: #fff; padding: .4rem .55rem; font-size: 10px; line-height: 1.25; box-shadow: 0 8px 20px rgb(0 0 0 / .18); opacity: 0; transform: translateY(4px); transition: opacity .14s ease, transform .14s ease; transition-delay: 0ms; }
 .group:hover .report-tooltip { opacity: 1; transform: translateY(0); transition-delay: 160ms; }
