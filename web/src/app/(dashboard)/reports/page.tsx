@@ -1,5 +1,5 @@
 import { eachDayOfInterval, endOfDay, endOfWeek, format, startOfDay, startOfWeek, subDays } from "date-fns";
-import { BarChart3, Download, FileSpreadsheet, SlidersHorizontal, CalendarDays, ScanLine, TrendingUp } from "lucide-react";
+import { BarChart3, Download, FileSpreadsheet, SlidersHorizontal, CalendarDays, ScanLine } from "lucide-react";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
 import { durationMinutes, formatDuration, roundDuration } from "@/lib/domain";
@@ -28,8 +28,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const days = eachDayOfInterval({ start, end });
   const heatmapDays = eachDayOfInterval({ start: startOfWeek(start, { weekStartsOn: 0 }), end: endOfWeek(end, { weekStartsOn: 0 }) });
   const activity = days.map((day) => ({ day, minutes: daily.get(format(day, "yyyy-MM-dd")) || 0 }));
-  const weekdayTotals = Array.from({ length: 7 }, (_, weekday) => activity.filter(({ day }) => day.getDay() === weekday).reduce((sum, item) => sum + item.minutes, 0));
-  const maxWeekday = Math.max(60, ...weekdayTotals);
   const rows = employees.filter((employee) => !employeeId || employee.id === employeeId).map((employee) => ({ employee, minutes: totals.get(employee.name) || 0 })).sort((a, b) => b.minutes - a.minutes);
   const totalMinutes = [...totals.values()].reduce((sum, value) => sum + value, 0);
   const maxDaily = Math.max(60, ...activity.map((item) => item.minutes));
