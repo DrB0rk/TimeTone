@@ -157,6 +157,8 @@ html.dark .report-intensity-legend { background: linear-gradient(90deg, #26372d,
 .report-tooltip { pointer-events: none; position: absolute; z-index: 20; white-space: nowrap; border-radius: .5rem; background: #17211b; color: #fff; padding: .4rem .55rem; font-size: 10px; line-height: 1.25; box-shadow: 0 8px 20px rgb(0 0 0 / .18); opacity: 0; transform: translateY(4px); transition: opacity .14s ease, transform .14s ease; transition-delay: 0ms; }
 .group:hover .report-tooltip { opacity: 1; transform: translateY(0); transition-delay: 160ms; }
 html.dark .report-tooltip { background: #edf5ee; color: #17211b; }
+.report-heat-grid { display: grid; width: 100%; grid-template-columns: repeat(auto-fill, 12px); gap: 4px; justify-content: space-between; }
+@media (min-width: 640px) { .report-heat-grid { grid-template-columns: repeat(auto-fill, 14px); gap: 6px; } }
 
 @keyframes rise-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes presence-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgb(216 255 98 / .34); } 50% { box-shadow: 0 0 0 8px rgb(216 255 98 / 0); } }
