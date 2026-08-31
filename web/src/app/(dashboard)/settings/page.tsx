@@ -1,4 +1,4 @@
-import { Clock3, KeyRound, Save, Settings2, SlidersHorizontal } from "lucide-react";
+import { ArchiveRestore, Clock3, Download, KeyRound, Save, Settings2, SlidersHorizontal } from "lucide-react";
 import { changePassword, saveSettings } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,22 @@ export default async function SettingsPage(
           <Field label="Confirm password" name="confirm_password" type="password" autoComplete="new-password" />
           <Button type="submit" variant="outline" className="sm:col-span-3 sm:w-fit"><KeyRound className="size-4" />Change password</Button>
         </form>
+      </SettingsSection>
+
+      <SettingsSection icon={ArchiveRestore} title="Migration" description="Move employees, terminals, settings, time entries, and audit history to another TimeTone server." className="mt-6 max-w-4xl">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-black/8 bg-[#f5f6f2] p-4 dark:border-white/10 dark:bg-[#243127]">
+            <p className="font-medium">Download a complete backup</p>
+            <p className="mt-1 text-sm leading-5 text-black/50 dark:text-white/60">Creates one portable JSON file containing all workspace data and history.</p>
+            <a href="/api/migration/export" className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-[#17211b] px-3 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:bg-[#26352c]"><Download className="size-4" />Download migration file</a>
+          </div>
+          <form action="/api/migration/import" method="post" encType="multipart/form-data" className="rounded-xl border border-black/8 bg-[#f5f6f2] p-4 dark:border-white/10 dark:bg-[#243127]">
+            <p className="font-medium">Restore on this server</p>
+            <p className="mt-1 text-sm leading-5 text-black/50 dark:text-white/60">This replaces the current workspace data. Export a backup first.</p>
+            <input name="file" type="file" accept="application/json,.json" required className="mt-4 block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium dark:file:bg-[#1b261f]" />
+            <button type="submit" className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-black/12 bg-white px-3 text-sm font-medium transition hover:-translate-y-0.5 dark:border-white/15 dark:bg-[#1b261f]"><ArchiveRestore className="size-4" />Import migration file</button>
+          </form>
+        </div>
       </SettingsSection>
     </>
   );
