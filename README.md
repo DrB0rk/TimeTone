@@ -14,6 +14,7 @@ team, terminals, time corrections and exportable reports.
 - Live attendance, employee management, editable time entries and audit events
 - Per-device power, screen and sync settings
 - CSV exports and exact/rounded-hours reporting
+- GitHub release update checks with native in-place updates and Docker redeploy guidance
 - Device setup portal, secure per-device credentials and browser USB updates
 - A single-container dashboard with SQLite storage and a persistent Docker volume
 

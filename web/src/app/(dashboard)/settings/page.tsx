@@ -1,10 +1,11 @@
-import { ArchiveRestore, Clock3, Download, KeyRound, Save, Settings2, SlidersHorizontal } from "lucide-react";
+import { ArchiveRestore, Clock3, Download, KeyRound, Rocket, Save, Settings2, SlidersHorizontal } from "lucide-react";
 import { changePassword, saveSettings } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getSettings } from "@/lib/db";
+import { ReleaseUpdater } from "@/components/release-updater";
 
 export default async function SettingsPage(
   { searchParams }: { searchParams: Promise<{ password?: string; migration?: string }> },
@@ -76,6 +77,9 @@ export default async function SettingsPage(
             <button type="submit" className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-black/12 bg-white px-3 text-sm font-medium transition hover:-translate-y-0.5 dark:border-white/15 dark:bg-[#1b261f]"><ArchiveRestore className="size-4" />Import migration file</button>
           </form>
         </div>
+      </SettingsSection>
+      <SettingsSection icon={Rocket} title="Software updates" description="Keep TimeTone current with stable releases from GitHub." className="mt-6 max-w-4xl">
+        <ReleaseUpdater />
       </SettingsSection>
     </>
   );

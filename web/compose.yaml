@@ -7,6 +7,7 @@ services:
     env_file: .env
     environment:
       DATABASE_PATH: /data/timekeep.db
+      TIMETONE_INSTALL_MODE: docker
       # Server-rendered dashboard dates use the office timezone. Override
       # TIMEKEEP_TIMEZONE in .env when deploying this project elsewhere.
       TZ: ${TIMEKEEP_TIMEZONE:-Europe/Amsterdam}

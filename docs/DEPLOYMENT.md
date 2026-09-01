@@ -68,9 +68,16 @@ Keep an encrypted, off-host backup; the database contains attendance data.
 
 ## Updating
 
-To update the dashboard, pull the desired TimeTone revision and re-run the
-installer (or run `docker compose up -d --build` in `web/`). Docker preserves
-the named database volume.
+From **Settings → Software updates**, use **Check for updates** to query the
+latest stable GitHub release. Native installs can install the selected release
+directly; the updater preserves `.env` and the SQLite data directory, builds the
+new version, and restarts the service. Keep the previous install directory as
+your rollback copy until you have verified the update.
+
+Docker installs show the available release but must be updated from the host:
+download the release, replace the checkout, and rerun `./install.sh --docker`
+(or run `docker compose up -d --build` in `web/`). Docker preserves the named
+database volume.
 
 ### Updating firmware
 
