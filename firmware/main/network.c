@@ -127,16 +127,16 @@ static void start_sntp_once(void)
 
 static void event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
-    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) esp_wifi_connect();
+    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) { tk_display_set_network_state(TK_DISPLAY_CONNECTING); esp_wifi_connect(); }
     else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         xEventGroupClearBits(s_events, CONNECTED_BIT);
-        tk_display_set_online(false);
+        tk_display_set_network_state(TK_DISPLAY_OFFLINE);
         esp_wifi_connect();
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = data;
         snprintf(s_ip, sizeof(s_ip), IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(s_events, CONNECTED_BIT);
-        tk_display_set_online(true);
+        tk_display_set_network_state(TK_DISPLAY_CONNECTING);
         start_sntp_once();
         ESP_LOGI(TAG, "connected with IP %s", s_ip);
     }

@@ -244,13 +244,14 @@ static void api_task(void *argument)
 {
     while (true) {
         if (tk_network_connected() && tk_config_get()->configured && !tk_display_is_sleeping()) {
-            tk_display_set_online(true);
+            tk_display_set_network_state(TK_DISPLAY_SYNCING);
             // Keep the terminal's employee list fresh while the server is
             // being configured, and after an administrator approves pairing.
             // The response is small and this avoids a long stale-PIN window.
-            fetch_config();
+            esp_err_t config_result = fetch_config();
             push_events();
             heartbeat();
+            tk_display_set_network_state(config_result == ESP_OK ? TK_DISPLAY_ONLINE : TK_DISPLAY_CONNECTING);
         }
         uint16_t seconds = tk_config_get()->sync_interval_seconds ?: s_sync_interval_seconds;
         xSemaphoreTake(s_wake, pdMS_TO_TICKS(seconds * 1000));

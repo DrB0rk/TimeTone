@@ -46,9 +46,12 @@ static _lock_t s_lvgl_lock;
 static lv_display_t *s_display;
 static lv_obj_t *s_main_screen, *s_setup_screen, *s_settings_screen, *s_calibration_screen, *s_header;
 static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_count_label, *s_brand_label;
+static lv_obj_t *s_sync_indicator;
 static lv_obj_t *s_setup_details;
 static char s_pin[9];
 static bool s_online;
+static tk_display_network_state_t s_network_state = TK_DISPLAY_OFFLINE;
+static uint8_t s_sync_frame;
 static bool s_calibrating, s_calibration_wait_release;
 static uint8_t s_calibration_step;
 static uint16_t s_calibration_x[4], s_calibration_y[4];
@@ -245,6 +248,19 @@ static void clock_timer(lv_timer_t *timer)
     lv_label_set_text(s_clock_label, text);
 }
 
+static void sync_animation_timer(lv_timer_t *timer)
+{
+    (void)timer;
+    if (!s_sync_indicator) return;
+    const char *frames[] = { "", ".", "..", "..." };
+    if (s_network_state == TK_DISPLAY_CONNECTING || s_network_state == TK_DISPLAY_SYNCING) {
+        char text[8]; snprintf(text, sizeof(text), "%s", frames[s_sync_frame++ % 4]);
+        lv_label_set_text(s_sync_indicator, text);
+    } else {
+        lv_label_set_text(s_sync_indicator, s_network_state == TK_DISPLAY_ONLINE ? "●" : "○");
+    }
+}
+
 static void show_main_screen(void)
 {
     lv_obj_clear_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN);
@@ -307,6 +323,7 @@ static void build_clock_ui(void)
     lv_obj_remove_style_all(s_header); lv_obj_set_size(s_header, H_RES, 46); lv_obj_set_style_bg_color(s_header, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_header, LV_OPA_COVER, 0);
     s_brand_label = lv_label_create(s_header); lv_label_set_text(s_brand_label, "TIMETONE"); lv_label_set_long_mode(s_brand_label, LV_LABEL_LONG_DOT); lv_obj_set_width(s_brand_label, 112); lv_obj_set_style_text_color(s_brand_label, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_brand_label, &lv_font_montserrat_14, 0); lv_obj_align(s_brand_label, LV_ALIGN_LEFT_MID, 14, 0);
     s_clock_label = lv_label_create(s_header); lv_obj_set_style_text_color(s_clock_label, lv_color_white(), 0); lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0); lv_obj_align(s_clock_label, LV_ALIGN_RIGHT_MID, -14, 0);
+    s_sync_indicator = lv_label_create(s_header); lv_obj_set_style_text_color(s_sync_indicator, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_sync_indicator, &lv_font_montserrat_14, 0); lv_obj_align(s_sync_indicator, LV_ALIGN_RIGHT_MID, -106, 0); lv_label_set_text(s_sync_indicator, "○");
     lv_obj_t *settings = lv_button_create(s_header); lv_obj_set_size(settings, 34, 28); lv_obj_align(settings, LV_ALIGN_RIGHT_MID, -66, 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x34443A), 0); lv_obj_set_style_radius(settings, 8, 0); lv_obj_set_style_border_width(settings, 0, 0); lv_obj_add_event_cb(settings, open_settings_event, LV_EVENT_CLICKED, NULL); lv_obj_t *settings_label = lv_label_create(settings); lv_label_set_text(settings_label, "SET"); lv_obj_set_style_text_font(settings_label, &lv_font_montserrat_14, 0); lv_obj_center(settings_label);
     lv_obj_t *prompt = lv_label_create(s_main_screen); lv_label_set_text(prompt, "Clock in or out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(fg_color()), 0); lv_obj_set_pos(prompt, 14, 55);
     s_pin_label = lv_label_create(s_main_screen); lv_obj_set_size(s_pin_label, 212, 38); lv_obj_set_style_bg_color(s_pin_label, lv_color_white(), 0); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_COVER, 0); lv_obj_set_style_border_width(s_pin_label, 1, 0); lv_obj_set_style_border_color(s_pin_label, lv_color_hex(0xD4D8D1), 0); lv_obj_set_style_radius(s_pin_label, 10, 0); lv_obj_set_style_pad_left(s_pin_label, 12, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 14, 78);
@@ -331,6 +348,7 @@ static void build_clock_ui(void)
     s_count_label = lv_label_create(s_main_screen); lv_obj_set_style_text_color(s_count_label, lv_color_hex(0x788078), 0); lv_obj_set_style_text_font(s_count_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_count_label, 14, 304);
     set_status("Ready", 0x168455); update_pin_label();
     lv_timer_create(clock_timer, 1000, NULL); clock_timer(NULL);
+    lv_timer_create(sync_animation_timer, 420, NULL);
 }
 
 static void build_setup_ui(void)
@@ -421,14 +439,17 @@ esp_err_t tk_display_init(void)
     return ESP_OK;
 }
 
-void tk_display_set_online(bool online)
+void tk_display_set_network_state(tk_display_network_state_t state)
 {
     if (!s_status_label || !s_setup_screen) return;
-    if (online == s_online) return;
-    s_online = online; _lock_acquire(&s_lvgl_lock);
-    if (online) {
+    s_network_state = state;
+    s_online = state == TK_DISPLAY_ONLINE;
+    _lock_acquire(&s_lvgl_lock);
+    if (state != TK_DISPLAY_OFFLINE) {
         lv_obj_clear_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);
-        set_status("Online - synced", 0x168455);
+        if (state == TK_DISPLAY_CONNECTING) set_status("Connecting to server", 0xC47B24);
+        else if (state == TK_DISPLAY_SYNCING) set_status("Syncing data", 0xC47B24);
+        else set_status("Online - synced", 0x168455);
     } else {
         char details[96]; snprintf(details, sizeof(details), "%s\nPassword: timekeep", tk_network_setup_ssid());
         lv_label_set_text(s_setup_details, details);
@@ -436,6 +457,11 @@ void tk_display_set_online(bool online)
         set_status("Offline - events will queue", 0xC47B24);
     }
     _lock_release(&s_lvgl_lock);
+}
+
+void tk_display_set_online(bool online)
+{
+    tk_display_set_network_state(online ? TK_DISPLAY_ONLINE : TK_DISPLAY_OFFLINE);
 }
 
 void tk_display_refresh(void)
