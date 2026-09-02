@@ -73,7 +73,11 @@ static void form_value(const char *body, const char *key, char *output, size_t o
     output[0] = 0;
     char needle[40];
     snprintf(needle, sizeof(needle), "%s=", key);
-    const char *start = strstr(body, needle);
+    const char *start = body;
+    while ((start = strstr(start, needle)) != NULL) {
+        if (start == body || start[-1] == '&') break;
+        start += strlen(needle);
+    }
     if (!start) return;
     start += strlen(needle);
     const char *end = strchr(start, '&');
@@ -118,7 +122,11 @@ static esp_err_t save_handler(httpd_req_t *request)
     free(body);
     if (!config.ssid[0] || !config.server_url[0]) return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, "Missing required value");
     while (strlen(config.server_url) && config.server_url[strlen(config.server_url) - 1] == '/') config.server_url[strlen(config.server_url) - 1] = 0;
-    ESP_ERROR_CHECK(tk_config_save(&config));
+    esp_err_t save_err = tk_config_save(&config);
+    ESP_LOGI(TAG, "saving terminal settings: server=%s ssid=%s result=%s", config.server_url, config.ssid, esp_err_to_name(save_err));
+    if (save_err != ESP_OK) {
+        return httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR, "Could not save settings to flash");
+    }
     httpd_resp_set_type(request, "text/html");
     httpd_resp_sendstr(request, "<html><body style='font:18px system-ui;padding:40px'><h1>Saved</h1><p>The terminal is restarting...</p></body></html>");
     vTaskDelay(pdMS_TO_TICKS(800));
