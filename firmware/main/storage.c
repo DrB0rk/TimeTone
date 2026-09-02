@@ -16,6 +16,11 @@
 static const char *TAG = "storage";
 static tk_config_t s_config;
 static tk_state_t s_state;
+typedef struct {
+    uint16_t count;
+    tk_code_request_t requests[TK_MAX_CODE_REQUESTS];
+} tk_code_queue_t;
+static tk_code_queue_t s_code_queue;
 static SemaphoreHandle_t s_mutex;
 
 static esp_err_t save_blob(const char *key, const void *data, size_t size)
@@ -61,14 +66,26 @@ esp_err_t tk_storage_init(void)
             }
             free(saved);
         }
-        size = sizeof(s_state);
-        nvs_get_blob(handle, "state", &s_state, &size);
+        // State has changed shape over releases. Read its stored length then
+        // copy the shared prefix so a smaller/newer state never wipes cached
+        // employees just because a blob grew or shrank.
+        size = 0;
+        if (nvs_get_blob(handle, "state", NULL, &size) == ESP_OK && size) {
+            void *saved = calloc(1, size);
+            if (saved && nvs_get_blob(handle, "state", saved, &size) == ESP_OK) {
+                memcpy(&s_state, saved, size < sizeof(s_state) ? size : sizeof(s_state));
+            }
+            free(saved);
+        }
+        size = sizeof(s_code_queue);
+        nvs_get_blob(handle, "code_queue", &s_code_queue, &size);
         nvs_close(handle);
     }
     if (s_state.version != 1) {
         memset(&s_state, 0, sizeof(s_state));
         s_state.version = 1;
     }
+    if (s_code_queue.count > TK_MAX_CODE_REQUESTS) memset(&s_code_queue, 0, sizeof(s_code_queue));
     if (!s_config.touch_x_scale) s_config.touch_x_scale = 1000;
     if (!s_config.touch_y_scale) s_config.touch_y_scale = 1000;
     if (!s_config.sync_interval_seconds) s_config.sync_interval_seconds = 5;
@@ -173,13 +190,13 @@ esp_err_t tk_toggle_employee(const char *employee_id, tk_event_t *created_event,
 esp_err_t tk_queue_code_request(const char *code)
 {
     if (!code || strlen(code) != 4) return ESP_ERR_INVALID_ARG;
-    tk_state_t *state = tk_state_lock();
-    if (state->code_request_count >= TK_MAX_CODE_REQUESTS) { tk_state_unlock(); return ESP_ERR_NO_MEM; }
-    tk_code_request_t *request = &state->code_requests[state->code_request_count++];
+    tk_state_lock();
+    if (s_code_queue.count >= TK_MAX_CODE_REQUESTS) { tk_state_unlock(); return ESP_ERR_NO_MEM; }
+    tk_code_request_t *request = &s_code_queue.requests[s_code_queue.count++];
     memset(request, 0, sizeof(*request));
     snprintf(request->id, sizeof(request->id), "%08lx-%lld", (unsigned long)esp_random(), (long long)esp_timer_get_time());
     strlcpy(request->code, code, sizeof(request->code));
-    esp_err_t err = tk_state_save();
+    esp_err_t err = save_blob("code_queue", &s_code_queue, sizeof(s_code_queue));
     tk_state_unlock();
     return err;
 }
@@ -187,20 +204,20 @@ esp_err_t tk_queue_code_request(const char *code)
 bool tk_peek_code_request(tk_code_request_t *request)
 {
     if (!request) return false;
-    tk_state_t *state = tk_state_lock();
-    bool found = state->code_request_count > 0;
-    if (found) *request = state->code_requests[0];
+    tk_state_lock();
+    bool found = s_code_queue.count > 0;
+    if (found) *request = s_code_queue.requests[0];
     tk_state_unlock();
     return found;
 }
 
 esp_err_t tk_pop_code_request(const char *id)
 {
-    tk_state_t *state = tk_state_lock();
-    if (!state->code_request_count || !id || strcmp(state->code_requests[0].id, id) != 0) { tk_state_unlock(); return ESP_ERR_NOT_FOUND; }
-    memmove(state->code_requests, state->code_requests + 1, (state->code_request_count - 1) * sizeof(tk_code_request_t));
-    state->code_request_count--;
-    esp_err_t err = tk_state_save();
+    tk_state_lock();
+    if (!s_code_queue.count || !id || strcmp(s_code_queue.requests[0].id, id) != 0) { tk_state_unlock(); return ESP_ERR_NOT_FOUND; }
+    memmove(s_code_queue.requests, s_code_queue.requests + 1, (s_code_queue.count - 1) * sizeof(tk_code_request_t));
+    s_code_queue.count--;
+    esp_err_t err = save_blob("code_queue", &s_code_queue, sizeof(s_code_queue));
     tk_state_unlock();
     return err;
 }

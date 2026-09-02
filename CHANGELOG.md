@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.21] - 2026-09-02
+
+- Store pending code submissions in a separate compact NVS record instead of expanding the cached employee state.
+- Safely migrate state blobs across size changes without discarding cached employees.
+
 ## [0.2.20] - 2026-09-02
 
 - Persist colour-code submissions before network delivery, provide immediate queue feedback, and retry safely after failures or restarts.
