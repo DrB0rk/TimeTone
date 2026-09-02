@@ -22,6 +22,17 @@ static esp_err_t save_blob(const char *key, const void *data, size_t size)
     nvs_handle_t handle;
     ESP_RETURN_ON_ERROR(nvs_open("timekeep", NVS_READWRITE, &handle), TAG, "open nvs");
     esp_err_t err = nvs_set_blob(handle, key, data, size);
+    // NVS stores blobs across multiple entries. On long-lived terminals,
+    // repeated updates can leave the namespace without a contiguous set of
+    // free entries even though the total partition still has room. Reclaim
+    // this key and retry once before reporting a real storage failure.
+    if (err == ESP_ERR_NVS_NOT_ENOUGH_SPACE) {
+        ESP_LOGW(TAG, "NVS space low while saving %s; reclaiming old value", key);
+        if (nvs_erase_key(handle, key) == ESP_OK) {
+            err = nvs_commit(handle);
+            if (err == ESP_OK) err = nvs_set_blob(handle, key, data, size);
+        }
+    }
     if (err == ESP_OK) err = nvs_commit(handle);
     nvs_close(handle);
     return err;
