@@ -7,6 +7,22 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # installer revision; callers may override it for a private fork.
 SOURCE_REF=${TIMETONE_SOURCE_REF:-0c6fdb9}
 
+stop_port_processes() {
+  STOP_PORT=$1
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnp 2>/dev/null | awk -v p=":$STOP_PORT" '$4 ~ p {print}' | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | sort -u | while IFS= read -r STOP_PID; do
+      [ -n "$STOP_PID" ] || continue
+      kill "$STOP_PID" 2>/dev/null || true
+    done
+  fi
+  if command -v fuser >/dev/null 2>&1; then fuser -k "$STOP_PORT/tcp" >/dev/null 2>&1 || true; fi
+  stop_wait=1
+  while [ "$stop_wait" -le 10 ] && (command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | awk -v p=":$STOP_PORT" '$4 ~ p {found=1} END {exit found ? 0 : 1}'); do
+    sleep 1
+    stop_wait=$((stop_wait + 1))
+  done
+}
+
 stop_before_update() {
   UPDATE_MODE=$(sed -n 's/^TIMETONE_INSTALL_MODE=//p' "$SCRIPT_DIR/web/.env" | head -n 1)
   if [ "$UPDATE_MODE" = docker ]; then
@@ -23,7 +39,7 @@ stop_before_update() {
     while [ "$stop_attempt" -le 15 ] && kill -0 "$UPDATE_PID" 2>/dev/null; do sleep 1; stop_attempt=$((stop_attempt + 1)); done
     if kill -0 "$UPDATE_PID" 2>/dev/null; then kill -9 "$UPDATE_PID" 2>/dev/null || true; fi
   fi
-  if command -v fuser >/dev/null 2>&1; then fuser -k "$(sed -n 's/^TIMETONE_PORT=//p' "$SCRIPT_DIR/web/.env" | head -n 1)/tcp" >/dev/null 2>&1 || true; fi
+  stop_port_processes "$(sed -n 's/^TIMETONE_PORT=//p' "$SCRIPT_DIR/web/.env" | head -n 1)"
 }
 
 # Re-running the same entrypoint against an existing installation is an
@@ -297,7 +313,7 @@ stop_native_server() {
   # A manually created systemd/nohup process may not use our PID file. On a
   # native deployment this port belongs to TimeTone, so release it before the
   # replacement runtime starts. Ignore systems without fuser.
-  if command -v fuser >/dev/null 2>&1; then fuser -k "$PORT/tcp" >/dev/null 2>&1 || true; fi
+  stop_port_processes "$PORT"
 }
 
 if [ "$UPDATE" = true ]; then
