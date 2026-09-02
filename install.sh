@@ -235,6 +235,22 @@ show_status() {
   fi
 }
 
+stop_native_server() {
+  if [ -f "$WEB_DIR/timetone.pid" ]; then
+    OLD_PID=$(sed -n '1p' "$WEB_DIR/timetone.pid")
+    case "$OLD_PID" in *[!0-9]*|'') OLD_PID="" ;; esac
+    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+      kill "$OLD_PID" 2>/dev/null || true
+      wait_attempt=1
+      while [ "$wait_attempt" -le 10 ] && kill -0 "$OLD_PID" 2>/dev/null; do
+        sleep 1
+        wait_attempt=$((wait_attempt + 1))
+      done
+      if kill -0 "$OLD_PID" 2>/dev/null; then kill -9 "$OLD_PID" 2>/dev/null || true; fi
+    fi
+  fi
+}
+
 if [ "$UPDATE" = true ]; then
   printf '%s▸%s Updating TimeTone in place (%s%s%s)…\n' "$C_GREEN" "$C_RESET" "$C_BOLD" "$MODE" "$C_RESET"
   if [ "$MODE" = docker ]; then
@@ -245,7 +261,7 @@ if [ "$UPDATE" = true ]; then
     else
       (cd "$WEB_DIR" && npm install --no-audit --no-fund && npm run build)
     fi
-    if [ -f "$WEB_DIR/timetone.pid" ] && kill -0 "$(cat "$WEB_DIR/timetone.pid")" 2>/dev/null; then kill "$(cat "$WEB_DIR/timetone.pid")" 2>/dev/null || true; fi
+    stop_native_server
     if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid); fi
   fi
   show_status || true
@@ -259,7 +275,9 @@ if [ -f "$WEB_DIR/.env" ] && [ "$FORCE" = false ] && [ "$NON_INTERACTIVE" = fals
   case "$replace" in y|Y|yes|YES) ;; *)
     printf '%s\n' "Kept existing configuration. Starting TimeTone…"
     if [ "$MODE" = docker ]; then (cd "$WEB_DIR" && docker compose up -d --build)
-    else if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 &); else (cd "$WEB_DIR" && npm run build >/dev/null && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 &); fi
+    else
+      stop_native_server
+      if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && npm run build >/dev/null && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); fi
     fi
     show_status || true
     exit 0 ;;
@@ -302,7 +320,7 @@ else
   else
     (cd "$WEB_DIR" && npm install && npm run build)
   fi
-  if [ -f "$WEB_DIR/timetone.pid" ] && kill -0 "$(cat "$WEB_DIR/timetone.pid")" 2>/dev/null; then kill "$(cat "$WEB_DIR/timetone.pid")" 2>/dev/null || true; fi
+  stop_native_server
   if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid); fi
 fi
 show_status || true
