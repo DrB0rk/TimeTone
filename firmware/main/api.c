@@ -20,6 +20,7 @@ static const char *TAG = "api";
 static SemaphoreHandle_t s_wake;
 static uint16_t s_sync_interval_seconds = 5;
 static bool s_ota_in_progress;
+static uint8_t s_sync_failures;
 
 typedef struct { char *data; size_t length; size_t capacity; } response_buffer_t;
 static void ota_task(void *argument);
@@ -253,9 +254,14 @@ static void api_task(void *argument)
             esp_err_t config_result = fetch_config();
             push_events();
             heartbeat();
-            tk_display_set_network_state(config_result == ESP_OK ? TK_DISPLAY_ONLINE : TK_DISPLAY_CONNECTING);
+            if (config_result == ESP_OK) { s_sync_failures = 0; tk_display_set_network_state(TK_DISPLAY_ONLINE); }
+            else { if (s_sync_failures < 5) s_sync_failures++; tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING); }
         }
         uint16_t seconds = tk_config_get()->sync_interval_seconds ?: s_sync_interval_seconds;
+        if (s_sync_failures) {
+            uint16_t multiplier = 1u << (s_sync_failures > 4 ? 4 : s_sync_failures);
+            seconds = seconds > (60 / multiplier) ? 60 : seconds * multiplier;
+        }
         xSemaphoreTake(s_wake, pdMS_TO_TICKS(seconds * 1000));
     }
 }

@@ -7,6 +7,7 @@ typedef enum {
     TK_DISPLAY_OFFLINE = 0,
     TK_DISPLAY_CONNECTING,
     TK_DISPLAY_SYNCING,
+    TK_DISPLAY_SYNC_RETRYING,
     TK_DISPLAY_ONLINE,
 } tk_display_network_state_t;
 void tk_display_set_network_state(tk_display_network_state_t state);

@@ -499,11 +499,12 @@ void tk_display_set_network_state(tk_display_network_state_t state)
     s_online = state == TK_DISPLAY_ONLINE;
     _lock_acquire(&s_lvgl_lock);
     if (state != TK_DISPLAY_OFFLINE) {
-        if (s_starting && state != TK_DISPLAY_ONLINE) { _lock_release(&s_lvgl_lock); return; }
-        if (state == TK_DISPLAY_ONLINE) { s_starting = false; lv_obj_add_flag(s_boot_screen, LV_OBJ_FLAG_HIDDEN); }
+        if (s_starting && state != TK_DISPLAY_ONLINE && state != TK_DISPLAY_SYNC_RETRYING) { _lock_release(&s_lvgl_lock); return; }
+        if (state == TK_DISPLAY_ONLINE || state == TK_DISPLAY_SYNC_RETRYING) { s_starting = false; lv_obj_add_flag(s_boot_screen, LV_OBJ_FLAG_HIDDEN); }
         lv_obj_clear_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);
         if (state == TK_DISPLAY_CONNECTING) set_status("Connecting to server", 0xC47B24);
         else if (state == TK_DISPLAY_SYNCING) set_status("Syncing data", 0xC47B24);
+        else if (state == TK_DISPLAY_SYNC_RETRYING) set_status("Sync delayed - retrying", 0xC47B24);
         else set_status("Online - synced", 0x168455);
     } else {
         if (s_starting) { _lock_release(&s_lvgl_lock); return; }
