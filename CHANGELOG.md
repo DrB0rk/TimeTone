@@ -3,6 +3,13 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.13] - 2026-09-02
+
+- Reorganize the portrait terminal settings screen to prevent overlapping controls.
+- Add a dedicated connection card and compact action layout.
+- Replace the settings glyph with a custom-drawn cog that does not depend on icon fonts.
+- Fix calibration instructions to render on the visible calibration screen.
+
 ## [0.2.12] - 2026-09-02
 
 - Overhaul terminal connection recovery, startup authentication, and full-sync scheduling.
