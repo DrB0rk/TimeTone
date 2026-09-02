@@ -21,6 +21,18 @@ stop_port_processes() {
     sleep 1
     stop_wait=$((stop_wait + 1))
   done
+  # A stale supervisor can leave the old Next.js listener alive after SIGTERM.
+  # Force-kill only processes currently identified as owning this port.
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnp 2>/dev/null | awk -v p=":$STOP_PORT" '$4 ~ p {print}' | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | sort -u | while IFS= read -r STOP_PID; do
+      [ -n "$STOP_PID" ] || continue
+      kill -9 "$STOP_PID" 2>/dev/null || true
+    done
+  fi
+  if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | awk -v p=":$STOP_PORT" '$4 ~ p {found=1} END {exit found ? 0 : 1}'; then
+    printf '%s\n' "Unable to free port $STOP_PORT; an existing process is still listening." >&2
+    return 1
+  fi
 }
 
 stop_before_update() {
