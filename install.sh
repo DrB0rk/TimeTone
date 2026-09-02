@@ -49,7 +49,10 @@ if [ -z "$MODE" ]; then
   else
     DEFAULT_MODE=docker
     command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1 || DEFAULT_MODE=native
-    MODE=$(ask "Install mode (docker/native)" "$DEFAULT_MODE")
+    printf 'Install mode (docker/native) [%s]: ' "$DEFAULT_MODE" >&2
+    MODE=""
+    if [ -r /dev/tty ]; then IFS= read -r MODE </dev/tty || true; else IFS= read -r MODE || true; fi
+    [ -n "$MODE" ] || MODE=$DEFAULT_MODE
   fi
 fi
 case "$MODE" in docker|native) ;; *) printf '%s\n' "Choose docker or native as the install mode." >&2; exit 1 ;; esac
