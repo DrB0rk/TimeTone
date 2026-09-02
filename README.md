@@ -116,8 +116,9 @@ credential automatically.
 
 In the dashboard, open **Settings → Software updates** and choose **Check for
 updates**. The updater reads stable releases from GitHub, shows release notes,
-and supports direct installation for native deployments while preserving the
-database and `.env` file.
+and supports direct installation for native and Docker deployments while
+preserving the database and `.env` file. Progress remains visible while the
+server builds and restarts.
 
 Approved terminals can also be updated remotely from **Devices**. When a newer
 stable GitHub release is available, choose **Start terminal update**; the
@@ -125,14 +126,17 @@ terminal downloads and verifies the release image over HTTPS during its next
 online sync, then reboots and reports the new version. USB Web Serial remains
 available for first flash and recovery.
 
-For Docker, use the release information shown in the dashboard and update from
-the host:
+The same installer can update an existing installation in place. It detects the
+installed mode from `.env`, keeps the admin secret and database, and rebuilds
+only that mode:
 
 ```bash
 cd TimeTone
-git pull
-./install.sh --docker
+./install.sh --update
 ```
+
+You can also rerun the one-line installer command; it detects an existing
+`TimeTone/web/.env` installation and updates it automatically.
 
 Native update logs are written to `web/timetone.log`; the previous install is
 kept as a rollback copy. Read [versioning and releases](docs/VERSIONING.md) for

@@ -2,6 +2,33 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+# Re-running the same entrypoint against an existing installation is an
+# update, not a fresh install. Fetch the current source first, while keeping
+# the user's .env and persistent data in place.
+if [ -f "$SCRIPT_DIR/web/.env" ] && [ "${TIMETONE_UPDATE_IN_PROGRESS:-}" != 1 ]; then
+  case " $* " in
+    *" --help "*) ;;
+    *)
+      command -v curl >/dev/null 2>&1 || { printf '%s\n' "curl is required to update TimeTone." >&2; exit 1; }
+      TMP_UPDATE=$(mktemp -d)
+      trap 'rm -rf "$TMP_UPDATE"' EXIT HUP INT TERM
+      printf '%s\n' "Existing TimeTone installation detected — downloading the latest version…" >&2
+      curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/refs/heads/main?cachebust=$(date +%s%N)" -o "$TMP_UPDATE/timetone.tar.gz"
+      mkdir -p "$TMP_UPDATE/source"
+      tar -xzf "$TMP_UPDATE/timetone.tar.gz" -C "$TMP_UPDATE/source"
+      NEW_SOURCE=$(find "$TMP_UPDATE/source" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+      [ -n "$NEW_SOURCE" ] || { printf '%s\n' "The update archive was empty." >&2; exit 1; }
+      cp "$SCRIPT_DIR/web/.env" "$TMP_UPDATE/.env"
+      cp -a "$NEW_SOURCE"/. "$SCRIPT_DIR"/
+      cp "$TMP_UPDATE/.env" "$SCRIPT_DIR/web/.env"
+      trap - EXIT HUP INT TERM
+      export TIMETONE_UPDATE_IN_PROGRESS=1
+      exec sh "$SCRIPT_DIR/install.sh" --update "$@"
+      ;;
+  esac
+fi
+
 if [ ! -f "$SCRIPT_DIR/web/package.json" ]; then
   command -v curl >/dev/null 2>&1 || { printf '%s\n' "curl is required for one-command installation." >&2; exit 1; }
   INSTALL_DIR=${TIMETONE_INSTALL_DIR:-"$(pwd)/TimeTone"}
@@ -25,6 +52,7 @@ ROOT_DIR=$SCRIPT_DIR
 WEB_DIR="$ROOT_DIR/web"
 NON_INTERACTIVE=false
 FORCE=false
+UPDATE=false
 MODE=""
 if [ -t 2 ] || [ -r /dev/tty ]; then
   C_RESET=$(printf '\033[0m'); C_BOLD=$(printf '\033[1m'); C_DIM=$(printf '\033[2m'); C_GREEN=$(printf '\033[32m'); C_CYAN=$(printf '\033[36m'); C_YELLOW=$(printf '\033[33m'); C_RED=$(printf '\033[31m'); C_BLUE=$(printf '\033[34m')
@@ -36,10 +64,11 @@ printf '%s───────────────────────�
 for arg in "$@"; do
   case "$arg" in
     --non-interactive) NON_INTERACTIVE=true ;;
+    --update) UPDATE=true ;;
     --native) MODE=native ;;
     --docker) MODE=docker ;;
     --force) FORCE=true ;;
-    -h|--help) printf '%s\n' "Usage: ./install.sh [--docker|--native] [--non-interactive] [--force]"; exit 0 ;;
+    -h|--help) printf '%s\n' "Usage: ./install.sh [--docker|--native] [--update] [--non-interactive] [--force]"; exit 0 ;;
     *) printf '%s\n' "Unknown option: $arg" >&2; exit 1 ;;
   esac
 done
@@ -54,6 +83,14 @@ ask() {
 }
 
 [ -n "$MODE" ] || MODE=${TIMETONE_MODE:-}
+if [ "$UPDATE" = true ] && [ -f "$WEB_DIR/.env" ]; then
+  # The installed mode is authoritative during an update. This prevents a
+  # copied command such as --native from accidentally converting a Docker
+  # deployment (or vice versa) and leaving its data service behind.
+  INSTALLED_MODE=$(sed -n 's/^TIMETONE_INSTALL_MODE=//p' "$WEB_DIR/.env" | head -n 1)
+  MODE=$INSTALLED_MODE
+  [ "$MODE" = native ] || MODE=docker
+fi
 DEFAULT_MODE=docker
 if [ -z "$MODE" ]; then
   if [ "$NON_INTERACTIVE" = true ]; then MODE=docker
@@ -151,6 +188,20 @@ show_status() {
     return 1
   fi
 }
+
+if [ "$UPDATE" = true ]; then
+  printf '%s▸%s Updating TimeTone in place (%s%s%s)…\n' "$C_GREEN" "$C_RESET" "$C_BOLD" "$MODE" "$C_RESET"
+  if [ "$MODE" = docker ]; then
+    (cd "$WEB_DIR" && docker compose config -q && docker compose up -d --build)
+  else
+    (cd "$WEB_DIR" && npm install --no-audit --no-fund && npm run build)
+    if [ -f "$WEB_DIR/timetone.pid" ] && kill -0 "$(cat "$WEB_DIR/timetone.pid")" 2>/dev/null; then kill "$(cat "$WEB_DIR/timetone.pid")" 2>/dev/null || true; fi
+    (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid)
+  fi
+  show_status || true
+  printf '%s\n' "Configuration and database preserved." >&2
+  exit 0
+fi
 
 if [ -f "$WEB_DIR/.env" ] && [ "$FORCE" = false ] && [ "$NON_INTERACTIVE" = false ]; then
   printf 'An existing web/.env was found. Replace it? [y/N]: ' >&2
