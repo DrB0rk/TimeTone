@@ -365,12 +365,15 @@ static void build_clock_ui(void)
     s_clock_label = lv_label_create(s_header); lv_obj_set_style_text_color(s_clock_label, lv_color_white(), 0); lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0); lv_obj_align(s_clock_label, LV_ALIGN_CENTER, 0, 0);
     s_status_dot = lv_led_create(s_header); lv_obj_set_size(s_status_dot, 12, 12); lv_obj_set_style_radius(s_status_dot, LV_RADIUS_CIRCLE, 0); lv_led_set_color(s_status_dot, lv_color_hex(0x788078)); lv_led_on(s_status_dot); lv_obj_align(s_status_dot, LV_ALIGN_RIGHT_MID, -58, 0);
     lv_obj_t *settings = lv_button_create(s_header); lv_obj_set_size(settings, 38, 32); lv_obj_align(settings, LV_ALIGN_RIGHT_MID, -8, 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x2D3D33), 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x405249), LV_STATE_PRESSED); lv_obj_set_style_radius(settings, 10, 0); lv_obj_set_style_border_width(settings, 1, 0); lv_obj_set_style_border_color(settings, lv_color_hex(0x52665A), 0); lv_obj_add_event_cb(settings, open_settings_event, LV_EVENT_CLICKED, NULL);
-    // A self-contained cog: ring, hub and eight round teeth. This avoids
-    // missing Unicode icon glyphs and remains crisp in every LVGL font setup.
-    static const int8_t tooth_pos[8][2] = {{16,2},{24,5},{28,13},{24,21},{16,25},{8,21},{4,13},{8,5}};
-    for (int i = 0; i < 8; ++i) { lv_obj_t *tooth = lv_obj_create(settings); lv_obj_remove_style_all(tooth); lv_obj_set_size(tooth, 6, 6); lv_obj_set_style_radius(tooth, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(tooth, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_bg_opa(tooth, LV_OPA_COVER, 0); lv_obj_set_pos(tooth, tooth_pos[i][0] - 3, tooth_pos[i][1] - 3); lv_obj_clear_flag(tooth, LV_OBJ_FLAG_CLICKABLE); }
-    lv_obj_t *gear_ring = lv_obj_create(settings); lv_obj_remove_style_all(gear_ring); lv_obj_set_size(gear_ring, 19, 19); lv_obj_set_style_radius(gear_ring, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_opa(gear_ring, LV_OPA_TRANSP, 0); lv_obj_set_style_border_width(gear_ring, 4, 0); lv_obj_set_style_border_color(gear_ring, lv_color_hex(0xD8FF62), 0); lv_obj_center(gear_ring); lv_obj_clear_flag(gear_ring, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_t *gear_hub = lv_obj_create(settings); lv_obj_remove_style_all(gear_hub); lv_obj_set_size(gear_hub, 6, 6); lv_obj_set_style_radius(gear_hub, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(gear_hub, lv_color_hex(0x2D3D33), 0); lv_obj_set_style_bg_opa(gear_hub, LV_OPA_COVER, 0); lv_obj_center(gear_hub); lv_obj_clear_flag(gear_hub, LV_OBJ_FLAG_CLICKABLE);
+    // LVGL ships this Font Awesome settings glyph with Montserrat 14.  Using
+    // the bundled icon font is more reliable than composing a cog from child
+    // objects (which caused rendering artefacts on the CYD display driver).
+    lv_obj_t *settings_icon = lv_label_create(settings);
+    lv_label_set_text(settings_icon, LV_SYMBOL_SETTINGS);
+    lv_obj_set_style_text_font(settings_icon, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(settings_icon, lv_color_hex(0xD8FF62), 0);
+    lv_obj_center(settings_icon);
+    lv_obj_clear_flag(settings_icon, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_t *prompt = lv_label_create(s_main_screen); lv_label_set_text(prompt, "Clock in or out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(fg_color()), 0); lv_obj_set_pos(prompt, 14, 55);
     s_pin_label = lv_label_create(s_main_screen); lv_obj_set_size(s_pin_label, 212, 38); lv_obj_set_style_bg_color(s_pin_label, lv_color_white(), 0); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_COVER, 0); lv_obj_set_style_border_width(s_pin_label, 1, 0); lv_obj_set_style_border_color(s_pin_label, lv_color_hex(0xD4D8D1), 0); lv_obj_set_style_radius(s_pin_label, 10, 0); lv_obj_set_style_pad_left(s_pin_label, 12, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 14, 78);
     s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 30); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_WRAP); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 120);

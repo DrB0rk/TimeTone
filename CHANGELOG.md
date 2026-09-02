@@ -3,6 +3,10 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.14] - 2026-09-02
+
+- Replace the custom-drawn terminal settings cog with LVGL's bundled Font Awesome settings icon.
+
 ## [0.2.13] - 2026-09-02
 
 - Reorganize the portrait terminal settings screen to prevent overlapping controls.
