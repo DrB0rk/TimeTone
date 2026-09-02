@@ -80,13 +80,13 @@ run_root() {
   if [ "$(id -u)" -eq 0 ]; then "$@"; elif command -v sudo >/dev/null 2>&1; then sudo "$@"; else printf '%s\n' "This step needs root privileges. Install sudo or rerun as root: $*" >&2; exit 1; fi
 }
 ensure_base_dependencies() {
-  command -v tar >/dev/null 2>&1 && command -v sed >/dev/null 2>&1 && command -v find >/dev/null 2>&1 && return
+  command -v tar >/dev/null 2>&1 && command -v sed >/dev/null 2>&1 && command -v find >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 && return
   if command -v apt-get >/dev/null 2>&1; then
     printf '%s▸%s Installing required system utilities…\n' "$C_GREEN" "$C_RESET"
     run_root apt-get update
     run_root apt-get install -y ca-certificates curl tar sed findutils openssl
   else
-    printf '%s\n' "Missing required utilities (tar, sed, find). Install them with your OS package manager and rerun." >&2
+    printf '%s\n' "Missing required utilities (curl, tar, sed, find). Install them with your OS package manager and rerun." >&2
     exit 1
   fi
 }
@@ -129,6 +129,28 @@ if [ -f "$WEB_DIR/.env" ] && [ -z "${TIMETONE_PORT:-}" ]; then
   EXISTING_PORT=$(sed -n 's/^TIMETONE_PORT=//p' "$WEB_DIR/.env" | head -n 1)
   [ -n "$EXISTING_PORT" ] && PORT=$EXISTING_PORT
 fi
+show_status() {
+  HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+  HEALTH_URL="http://127.0.0.1:$PORT/api/health"
+  HEALTH_OK=false
+  attempt=1
+  while [ "$attempt" -le 15 ]; do
+    if curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then HEALTH_OK=true; break; fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+  if [ "$HEALTH_OK" = true ]; then
+    printf '\n%s%s✓ Installation complete%s\n' "$C_BOLD" "$C_GREEN" "$C_RESET"
+    printf '  Status: %srunning%s\n' "$C_GREEN" "$C_RESET"
+    printf '  LAN URL: %shttp://%s:%s%s\n' "$C_CYAN" "${HOST_IP:-localhost}" "$PORT" "$C_RESET"
+    printf '  Local health: %shealthy%s\n' "$C_GREEN" "$C_RESET"
+  else
+    printf '\n%s%s✗ Installation needs attention%s\n' "$C_BOLD" "$C_RED" "$C_RESET"
+    printf '  URL: http://%s:%s\n' "${HOST_IP:-localhost}" "$PORT"
+    if [ "$MODE" = native ]; then printf '  Check logs: %s/timetone.log\n' "$WEB_DIR"; else printf '  Check status: cd %s && docker compose ps\n' "$WEB_DIR"; fi
+    return 1
+  fi
+}
 
 if [ -f "$WEB_DIR/.env" ] && [ "$FORCE" = false ] && [ "$NON_INTERACTIVE" = false ]; then
   printf 'An existing web/.env was found. Replace it? [y/N]: ' >&2
@@ -138,6 +160,7 @@ if [ -f "$WEB_DIR/.env" ] && [ "$FORCE" = false ] && [ "$NON_INTERACTIVE" = fals
     if [ "$MODE" = docker ]; then (cd "$WEB_DIR" && docker compose up -d --build)
     else (cd "$WEB_DIR" && npm run build >/dev/null && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 &)
     fi
+    show_status || true
     exit 0 ;;
   esac
 fi
@@ -177,7 +200,6 @@ else
   if [ -f "$WEB_DIR/timetone.pid" ] && kill -0 "$(cat "$WEB_DIR/timetone.pid")" 2>/dev/null; then kill "$(cat "$WEB_DIR/timetone.pid")" 2>/dev/null || true; fi
   (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid)
 fi
-HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-printf '\n%s%s✓ TimeTone is ready%s at http://%s:%s\n' "$C_BOLD" "$C_GREEN" "$C_RESET" "${HOST_IP:-localhost}" "$PORT"
+show_status || true
 [ "$MODE" = native ] && printf '%s\n' "Native logs: $WEB_DIR/timetone.log  |  PID file: $WEB_DIR/timetone.pid"
 printf '%s\n' "For browser-based USB updates, serve this address through HTTPS (or use localhost)."
