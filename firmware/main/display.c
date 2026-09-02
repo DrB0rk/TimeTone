@@ -58,7 +58,6 @@ static volatile bool s_ota_visible;
 static bool s_calibrating, s_calibration_wait_release;
 static uint8_t s_calibration_step;
 static uint16_t s_calibration_x[4], s_calibration_y[4];
-static lv_obj_t *s_calibration_hint;
 static lv_obj_t *s_calibration_progress;
 static volatile bool s_screen_sleeping;
 static volatile bool s_screen_off;
@@ -324,7 +323,9 @@ static void settings_theme_event(lv_event_t *event)
 static void settings_calibrate_event(lv_event_t *event)
 {
     s_calibrating = true; s_calibration_wait_release = true; s_calibration_step = 0;
-    lv_label_set_text(s_calibration_hint, "Touch top left target");
+    // This label belongs to the calibration screen. Updating the former
+    // settings hint here made the instruction disappear behind the overlay.
+    lv_label_set_text(s_calibration_progress, "Touch top left target");
     lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(s_calibration_screen, LV_OBJ_FLAG_HIDDEN);
 }
@@ -336,14 +337,14 @@ static void calibration_back_event(lv_event_t *event)
     lv_obj_clear_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
 }
 
-static lv_obj_t *settings_button(lv_obj_t *parent, const char *text, int y, lv_event_cb_t callback)
+static lv_obj_t *settings_button(lv_obj_t *parent, const char *text, int x, int y, int width, int height, lv_event_cb_t callback)
 {
     lv_obj_t *button = lv_button_create(parent);
-    lv_obj_set_size(button, 204, 40); lv_obj_set_pos(button, 18, y);
-    lv_obj_set_style_radius(button, 10, 0); lv_obj_set_style_bg_color(button, lv_color_hex(0x26352C), 0);
+    lv_obj_set_size(button, width, height); lv_obj_set_pos(button, x, y);
+    lv_obj_set_style_radius(button, 10, 0); lv_obj_set_style_bg_color(button, lv_color_hex(0x2D3D33), 0);
     lv_obj_set_style_bg_color(button, lv_color_hex(0xD8FF62), LV_STATE_PRESSED);
-    lv_obj_set_style_border_width(button, 0, 0); lv_obj_add_event_cb(button, callback, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *label = lv_label_create(button); lv_label_set_text(label, text); lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0); lv_obj_center(label);
+    lv_obj_set_style_border_width(button, 1, 0); lv_obj_set_style_border_color(button, lv_color_hex(0x405249), 0); lv_obj_add_event_cb(button, callback, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *label = lv_label_create(button); lv_label_set_text(label, text); lv_obj_set_style_text_color(label, lv_color_white(), 0); lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0); lv_obj_center(label);
     return button;
 }
 
@@ -363,13 +364,13 @@ static void build_clock_ui(void)
     s_brand_label = lv_label_create(s_header); lv_label_set_text(s_brand_label, "TIMETONE"); lv_label_set_long_mode(s_brand_label, LV_LABEL_LONG_DOT); lv_obj_set_width(s_brand_label, 112); lv_obj_set_style_text_color(s_brand_label, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_brand_label, &lv_font_montserrat_14, 0); lv_obj_align(s_brand_label, LV_ALIGN_LEFT_MID, 14, 0);
     s_clock_label = lv_label_create(s_header); lv_obj_set_style_text_color(s_clock_label, lv_color_white(), 0); lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0); lv_obj_align(s_clock_label, LV_ALIGN_CENTER, 0, 0);
     s_status_dot = lv_led_create(s_header); lv_obj_set_size(s_status_dot, 12, 12); lv_obj_set_style_radius(s_status_dot, LV_RADIUS_CIRCLE, 0); lv_led_set_color(s_status_dot, lv_color_hex(0x788078)); lv_led_on(s_status_dot); lv_obj_align(s_status_dot, LV_ALIGN_RIGHT_MID, -58, 0);
-    lv_obj_t *settings = lv_button_create(s_header); lv_obj_set_size(settings, 34, 28); lv_obj_align(settings, LV_ALIGN_RIGHT_MID, -14, 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x34443A), 0); lv_obj_set_style_radius(settings, 8, 0); lv_obj_set_style_border_width(settings, 0, 0); lv_obj_add_event_cb(settings, open_settings_event, LV_EVENT_CLICKED, NULL);
-    // Draw a gear from simple shapes instead of a font symbol (which is not
-    // present in every configured LVGL font and renders as a square).
-    static const int8_t gear_pos[8][2] = {{15,2},{23,5},{25,12},{23,19},{15,21},{7,19},{5,12},{7,5}};
-    for (int i = 0; i < 8; ++i) { lv_obj_t *tooth = lv_obj_create(settings); lv_obj_remove_style_all(tooth); lv_obj_set_size(tooth, 5, 7); lv_obj_set_style_radius(tooth, 2, 0); lv_obj_set_style_bg_color(tooth, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_bg_opa(tooth, LV_OPA_COVER, 0); lv_obj_set_pos(tooth, gear_pos[i][0], gear_pos[i][1]); lv_obj_clear_flag(tooth, LV_OBJ_FLAG_CLICKABLE); }
-    lv_obj_t *gear_center = lv_obj_create(settings); lv_obj_remove_style_all(gear_center); lv_obj_set_size(gear_center, 13, 13); lv_obj_set_style_radius(gear_center, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(gear_center, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_bg_opa(gear_center, LV_OPA_COVER, 0); lv_obj_center(gear_center); lv_obj_clear_flag(gear_center, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_t *gear_hole = lv_obj_create(settings); lv_obj_remove_style_all(gear_hole); lv_obj_set_size(gear_hole, 5, 5); lv_obj_set_style_radius(gear_hole, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(gear_hole, lv_color_hex(0x34443A), 0); lv_obj_set_style_bg_opa(gear_hole, LV_OPA_COVER, 0); lv_obj_center(gear_hole); lv_obj_clear_flag(gear_hole, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_t *settings = lv_button_create(s_header); lv_obj_set_size(settings, 38, 32); lv_obj_align(settings, LV_ALIGN_RIGHT_MID, -8, 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x2D3D33), 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x405249), LV_STATE_PRESSED); lv_obj_set_style_radius(settings, 10, 0); lv_obj_set_style_border_width(settings, 1, 0); lv_obj_set_style_border_color(settings, lv_color_hex(0x52665A), 0); lv_obj_add_event_cb(settings, open_settings_event, LV_EVENT_CLICKED, NULL);
+    // A self-contained cog: ring, hub and eight round teeth. This avoids
+    // missing Unicode icon glyphs and remains crisp in every LVGL font setup.
+    static const int8_t tooth_pos[8][2] = {{16,2},{24,5},{28,13},{24,21},{16,25},{8,21},{4,13},{8,5}};
+    for (int i = 0; i < 8; ++i) { lv_obj_t *tooth = lv_obj_create(settings); lv_obj_remove_style_all(tooth); lv_obj_set_size(tooth, 6, 6); lv_obj_set_style_radius(tooth, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(tooth, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_bg_opa(tooth, LV_OPA_COVER, 0); lv_obj_set_pos(tooth, tooth_pos[i][0] - 3, tooth_pos[i][1] - 3); lv_obj_clear_flag(tooth, LV_OBJ_FLAG_CLICKABLE); }
+    lv_obj_t *gear_ring = lv_obj_create(settings); lv_obj_remove_style_all(gear_ring); lv_obj_set_size(gear_ring, 19, 19); lv_obj_set_style_radius(gear_ring, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_opa(gear_ring, LV_OPA_TRANSP, 0); lv_obj_set_style_border_width(gear_ring, 4, 0); lv_obj_set_style_border_color(gear_ring, lv_color_hex(0xD8FF62), 0); lv_obj_center(gear_ring); lv_obj_clear_flag(gear_ring, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_t *gear_hub = lv_obj_create(settings); lv_obj_remove_style_all(gear_hub); lv_obj_set_size(gear_hub, 6, 6); lv_obj_set_style_radius(gear_hub, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(gear_hub, lv_color_hex(0x2D3D33), 0); lv_obj_set_style_bg_opa(gear_hub, LV_OPA_COVER, 0); lv_obj_center(gear_hub); lv_obj_clear_flag(gear_hub, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_t *prompt = lv_label_create(s_main_screen); lv_label_set_text(prompt, "Clock in or out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(fg_color()), 0); lv_obj_set_pos(prompt, 14, 55);
     s_pin_label = lv_label_create(s_main_screen); lv_obj_set_size(s_pin_label, 212, 38); lv_obj_set_style_bg_color(s_pin_label, lv_color_white(), 0); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_COVER, 0); lv_obj_set_style_border_width(s_pin_label, 1, 0); lv_obj_set_style_border_color(s_pin_label, lv_color_hex(0xD4D8D1), 0); lv_obj_set_style_radius(s_pin_label, 10, 0); lv_obj_set_style_pad_left(s_pin_label, 12, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 14, 78);
     s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 30); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_WRAP); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 120);
@@ -433,15 +434,17 @@ static void build_settings_ui(void)
 {
     s_settings_screen = lv_obj_create(lv_screen_active());
     lv_obj_remove_style_all(s_settings_screen); lv_obj_set_size(s_settings_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_settings_screen, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_settings_screen, LV_OPA_COVER, 0); lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_t *title = lv_label_create(s_settings_screen); lv_label_set_text(title, "TERMINAL SETTINGS"); lv_obj_set_style_text_color(title, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0); lv_obj_set_pos(title, 18, 18);
-    lv_obj_t *subtitle = lv_label_create(s_settings_screen); lv_label_set_text(subtitle, "Display and touch controls"); lv_obj_set_style_text_color(subtitle, lv_color_hex(0xC8D0C9), 0); lv_obj_set_style_text_font(subtitle, &lv_font_montserrat_14, 0); lv_obj_set_pos(subtitle, 18, 44);
-    s_ip_label = lv_label_create(s_settings_screen); lv_obj_set_style_text_color(s_ip_label, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_ip_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_ip_label, 18, 68); lv_label_set_text(s_ip_label, "IP: 0.0.0.0");
-    s_server_label = lv_label_create(s_settings_screen); lv_obj_set_width(s_server_label, 204); lv_label_set_long_mode(s_server_label, LV_LABEL_LONG_DOT); lv_obj_set_style_text_color(s_server_label, lv_color_hex(0xA9B6A9), 0); lv_obj_set_style_text_font(s_server_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_server_label, 18, 86); lv_label_set_text(s_server_label, "Server: not configured");
-    settings_button(s_settings_screen, "TOGGLE LIGHT / DARK", 110, settings_theme_event);
-    settings_button(s_settings_screen, "CALIBRATE TOUCH", 160, settings_calibrate_event);
-    settings_button(s_settings_screen, "SYNC NOW", 210, settings_sync_event);
-    s_calibration_hint = lv_label_create(s_settings_screen); lv_label_set_text(s_calibration_hint, "Calibration uses 4 corner taps."); lv_obj_set_style_text_font(s_calibration_hint, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(s_calibration_hint, lv_color_hex(0xA9B6A9), 0); lv_obj_set_pos(s_calibration_hint, 18, 255);
-    settings_button(s_settings_screen, "BACK", 274, settings_back_event);
+    lv_obj_t *title = lv_label_create(s_settings_screen); lv_label_set_text(title, "TERMINAL SETTINGS"); lv_obj_set_style_text_color(title, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0); lv_obj_set_pos(title, 14, 14);
+    lv_obj_t *subtitle = lv_label_create(s_settings_screen); lv_label_set_text(subtitle, "Connection and terminal controls"); lv_obj_set_style_text_color(subtitle, lv_color_hex(0xA9B6A9), 0); lv_obj_set_style_text_font(subtitle, &lv_font_montserrat_14, 0); lv_obj_set_pos(subtitle, 14, 36);
+    lv_obj_t *connection = lv_obj_create(s_settings_screen); lv_obj_remove_style_all(connection); lv_obj_set_size(connection, 212, 62); lv_obj_set_pos(connection, 14, 60); lv_obj_set_style_bg_color(connection, lv_color_hex(0x26352C), 0); lv_obj_set_style_bg_opa(connection, LV_OPA_COVER, 0); lv_obj_set_style_radius(connection, 12, 0); lv_obj_set_style_border_width(connection, 1, 0); lv_obj_set_style_border_color(connection, lv_color_hex(0x405249), 0);
+    s_ip_label = lv_label_create(connection); lv_obj_set_style_text_color(s_ip_label, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_ip_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_ip_label, 12, 10); lv_label_set_text(s_ip_label, "IP: 0.0.0.0");
+    s_server_label = lv_label_create(connection); lv_obj_set_width(s_server_label, 186); lv_label_set_long_mode(s_server_label, LV_LABEL_LONG_DOT); lv_obj_set_style_text_color(s_server_label, lv_color_hex(0xC8D0C9), 0); lv_obj_set_style_text_font(s_server_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_server_label, 12, 34); lv_label_set_text(s_server_label, "Server: not configured");
+    lv_obj_t *section = lv_label_create(s_settings_screen); lv_label_set_text(section, "ACTIONS"); lv_obj_set_style_text_color(section, lv_color_hex(0x788078), 0); lv_obj_set_style_text_font(section, &lv_font_montserrat_14, 0); lv_obj_set_pos(section, 14, 134);
+    settings_button(s_settings_screen, "THEME", 14, 154, 102, 40, settings_theme_event);
+    settings_button(s_settings_screen, "SYNC", 124, 154, 102, 40, settings_sync_event);
+    settings_button(s_settings_screen, "CALIBRATE TOUCH", 14, 204, 212, 38, settings_calibrate_event);
+    lv_obj_t *hint = lv_label_create(s_settings_screen); lv_label_set_text(hint, "Calibration uses 4 corner taps."); lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(hint, lv_color_hex(0xA9B6A9), 0); lv_obj_set_pos(hint, 14, 250);
+    settings_button(s_settings_screen, "BACK", 14, 272, 212, 36, settings_back_event);
 }
 
 static void build_calibration_ui(void)
