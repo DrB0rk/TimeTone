@@ -15,6 +15,9 @@ if [ ! -f "$SCRIPT_DIR/web/package.json" ]; then
     SOURCE_DIR=$(find "$TMP_DIR/source" -mindepth 1 -maxdepth 1 -type d | head -n 1)
     mkdir -p "$INSTALL_DIR"
     cp -R "$SOURCE_DIR"/. "$INSTALL_DIR"/
+    # GitHub's codeload CDN can lag behind the raw branch. Refresh the
+    # bootstrap entrypoint explicitly so piped installs run this version.
+    curl -fsSL "https://raw.githubusercontent.com/DrB0rk/TimeTone/main/install.sh?cachebust=$(date +%s)" -o "$INSTALL_DIR/install.sh"
   }
   exec sh "$INSTALL_DIR/install.sh" "$@"
 fi
