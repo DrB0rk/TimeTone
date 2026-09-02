@@ -11,26 +11,20 @@ write_status() {
   mkdir -p "$(dirname "$STATUS_FILE")"
   printf '{"status":"%s","message":"%s","version":"%s","updatedAt":"%s"}\n' "$1" "$2" "$TAG" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STATUS_FILE"
 }
-trap 'write_status error "Update failed during installation"' EXIT
+trap 'write_status error "Docker update failed"' EXIT
 write_status preparing "Preparing TimeTone $TAG"
 mkdir -p "$EXTRACTED"
 tar -xzf "$ARCHIVE" -C "$EXTRACTED"
 SOURCE=$(find "$EXTRACTED" -mindepth 1 -maxdepth 1 -type d | head -n 1)
 [ -n "$SOURCE" ] || { echo "Release archive contained no source directory" >&2; exit 1; }
-write_status building "Building TimeTone $TAG"
 [ -f "$CURRENT_ROOT/web/.env" ] && cp "$CURRENT_ROOT/web/.env" "$SOURCE/web/.env"
-sed -i "s#^DATABASE_PATH=.*#DATABASE_PATH=$CURRENT_ROOT/web/data/timekeep.db#" "$SOURCE/web/.env"
 rm -rf "$SOURCE/web/data" "$SOURCE/web/node_modules" "$SOURCE/web/.next"
-mkdir -p "$SOURCE/web/data"
-if [ -d "$CURRENT_ROOT/web/data" ]; then cp -a "$CURRENT_ROOT/web/data/." "$SOURCE/web/data/"; fi
-(cd "$SOURCE/web" && npm install --no-audit --no-fund && npm run build)
-OLD_PID=""
-if [ -f "$CURRENT_ROOT/web/timetone.pid" ]; then OLD_PID=$(cat "$CURRENT_ROOT/web/timetone.pid" 2>/dev/null || true); fi
-if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then kill "$OLD_PID" 2>/dev/null || true; fi
-mv "$CURRENT_ROOT" "${CURRENT_ROOT}.previous-$TAG"
-mv "$SOURCE" "$CURRENT_ROOT"
-write_status restarting "Restarting TimeTone $TAG"
-(cd "$CURRENT_ROOT/web" && PORT=$(grep '^TIMETONE_PORT=' .env | cut -d= -f2 || printf '3000') nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid)
+write_status building "Building Docker image for TimeTone $TAG"
+# Preserve the checked-out install directory and persistent named volume while
+# replacing the application source used by the compose project.
+cp -a "$SOURCE"/. "$CURRENT_ROOT"/
+write_status restarting "Restarting the TimeTone Docker service"
+(cd "$CURRENT_ROOT/web" && docker compose up -d --build)
 trap - EXIT
 write_status complete "TimeTone $TAG is ready"
 rm -rf "$STAGE"

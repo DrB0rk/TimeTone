@@ -3,6 +3,12 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.4] - 2026-09-02
+
+- Make software updates installable from the dashboard for native and Docker deployments.
+- Add persistent update status, progress stages, and restart feedback.
+- Add separate health-check and full-settings sync controls.
+
 ## [0.2.3] - 2026-09-02
 
 - Improve terminal connection status visibility with a persistent colored dot.

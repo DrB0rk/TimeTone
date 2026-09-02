@@ -6,9 +6,17 @@ import { requireAuth } from "@/lib/auth";
 export const runtime = "nodejs";
 const repository = "DrB0rk/TimeTone";
 
+function statusPath() {
+  const databasePath = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "timekeep.db");
+  return path.join(path.dirname(databasePath), "update-status.json");
+}
+
+async function writeStatus(status: string, message: string, version?: string) {
+  await fs.writeFile(statusPath(), JSON.stringify({ status, message, version: version || null, updatedAt: new Date().toISOString() }));
+}
+
 export async function POST(request: Request) {
   await requireAuth();
-  if (process.env.TIMETONE_INSTALL_MODE !== "native") return Response.json({ error: "In-place updates are available for native installs. For Docker, download the release and rerun install.sh --docker." }, { status: 409 });
   const body = await request.json().catch(() => ({})) as { tag?: string };
   const tag = String(body.tag || "").match(/^v?\d+\.\d+\.\d+$/)?.[0];
   if (!tag) return Response.json({ error: "Choose a valid release version first." }, { status: 400 });
@@ -21,11 +29,13 @@ export async function POST(request: Request) {
   if (!archiveResponse.ok) return Response.json({ error: "Could not download the release archive." }, { status: 502 });
   const stage = await fs.mkdtemp(path.join(os.tmpdir(), "timetone-update-"));
   const archive = path.join(stage, "release.tar.gz");
+  await writeStatus("downloading", `Downloading TimeTone ${tag.replace(/^v/, "")}…`, tag.replace(/^v/, ""));
   await fs.writeFile(archive, Buffer.from(await archiveResponse.arrayBuffer()));
-  const root = path.resolve(process.cwd(), "..");
-  const script = path.join(root, "scripts", "install-release.sh");
+  const docker = process.env.TIMETONE_INSTALL_MODE === "docker";
+  const root = docker ? (process.env.TIMETONE_UPDATE_ROOT || "/host") : path.resolve(process.cwd(), "..");
+  const script = path.join(root, "scripts", docker ? "install-release-docker.sh" : "install-release.sh");
   const { spawn } = await import("node:child_process");
-  const child = spawn("sh", [script, root, stage, tag], { detached: true, stdio: "ignore", env: { ...process.env, TIMETONE_UPDATE_ROOT: root } });
+  const child = spawn("sh", [script, root, stage, tag], { detached: true, stdio: "ignore", env: { ...process.env, TIMETONE_UPDATE_ROOT: root, TIMETONE_UPDATE_STATUS: statusPath() } });
   child.unref();
-  return Response.json({ ok: true, version: tag.replace(/^v/, ""), message: "Update downloaded. The server will restart after the new build completes." });
+  return Response.json({ ok: true, version: tag.replace(/^v/, ""), message: docker ? "Update downloaded. Docker is rebuilding the server now." : "Update downloaded. The server is building and will restart automatically." });
 }
