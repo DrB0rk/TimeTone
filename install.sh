@@ -59,7 +59,8 @@ stop_before_update() {
 # the user's .env and persistent data in place.
 if [ -f "$SCRIPT_DIR/web/.env" ] && [ "${TIMETONE_UPDATE_IN_PROGRESS:-}" != 1 ]; then
   case " $* " in
-    *" --help "*|*" --reset-password "*) ;;
+    *" --help "*) ;;
+    *" --reset-password "*) ;;
     *)
       command -v curl >/dev/null 2>&1 || { printf '%s\n' "curl is required to update TimeTone." >&2; exit 1; }
       TMP_UPDATE=$(mktemp -d)
