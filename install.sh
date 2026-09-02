@@ -198,20 +198,38 @@ show_status() {
   HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
   HEALTH_URL="http://127.0.0.1:$PORT/api/health"
   HEALTH_OK=false
+  HEALTH_BODY=""
   attempt=1
   while [ "$attempt" -le 15 ]; do
-    if curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then HEALTH_OK=true; break; fi
+    if HEALTH_BODY=$(curl -fsS "$HEALTH_URL" 2>/dev/null); then HEALTH_OK=true; break; fi
     sleep 1
     attempt=$((attempt + 1))
   done
+  APP_VERSION=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$WEB_DIR/package.json" | head -n 1)
+  [ -n "$APP_VERSION" ] || APP_VERSION=$(sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$/\1/p' "$ROOT_DIR/VERSION" | head -n 1)
+  [ -n "$APP_VERSION" ] || APP_VERSION="unknown"
+  if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then BUNDLE_STATUS="prebuilt production bundle"; else BUNDLE_STATUS="locally built production bundle"; fi
+  if [ "$MODE" = native ]; then
+    DATA_PATH=$(sed -n 's/^DATABASE_PATH=//p' "$WEB_DIR/.env" | head -n 1)
+    [ -n "$DATA_PATH" ] || DATA_PATH="$WEB_DIR/data/timekeep.db"
+  else
+    DATA_PATH="Docker volume: timekeep-data"
+  fi
+  if [ "$UPDATE" = true ]; then OPERATION="updated"; else OPERATION="installed"; fi
   if [ "$HEALTH_OK" = true ]; then
-    printf '\n%s%s✓ Installation complete%s\n' "$C_BOLD" "$C_GREEN" "$C_RESET"
-    printf '  Status: %srunning%s\n' "$C_GREEN" "$C_RESET"
+    printf '\n%s%s✓ TimeTone %s successfully%s\n' "$C_BOLD" "$C_GREEN" "$OPERATION" "$C_RESET"
+    printf '  Version: %s%s%s\n' "$C_CYAN" "$APP_VERSION" "$C_RESET"
+    printf '  Mode: %s%s%s\n' "$C_CYAN" "$MODE" "$C_RESET"
+    printf '  Web runtime: %s%s%s\n' "$C_CYAN" "$BUNDLE_STATUS" "$C_RESET"
     printf '  LAN URL: %shttp://%s:%s%s\n' "$C_CYAN" "${HOST_IP:-localhost}" "$PORT" "$C_RESET"
-    printf '  Local health: %shealthy%s\n' "$C_GREEN" "$C_RESET"
+    printf '  Local health: %shealthy%s (%s)\n' "$C_GREEN" "$C_RESET" "$HEALTH_URL"
+    printf '  Persistent data: %s%s%s\n' "$C_DIM" "$DATA_PATH" "$C_RESET"
+    printf '  Admin UI: %sopen the LAN URL above and sign in%s\n' "$C_DIM" "$C_RESET"
   else
     printf '\n%s%s✗ Installation needs attention%s\n' "$C_BOLD" "$C_RED" "$C_RESET"
+    printf '  Version detected: %s\n' "$APP_VERSION"
     printf '  URL: http://%s:%s\n' "${HOST_IP:-localhost}" "$PORT"
+    printf '  Health endpoint: %s\n' "$HEALTH_URL"
     if [ "$MODE" = native ]; then printf '  Check logs: %s/timetone.log\n' "$WEB_DIR"; else printf '  Check status: cd %s && docker compose ps\n' "$WEB_DIR"; fi
     return 1
   fi
