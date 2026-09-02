@@ -2,17 +2,18 @@
 
 ## 1. Install the dashboard
 
-For a supported self-hosted installation, use the interactive installer from
-the repository root:
+For a supported self-hosted installation, run the latest interactive installer
+directly from GitHub:
 
 ```bash
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/DrB0rk/TimeTone/main/install.sh | sh
 ```
 
-It asks for an admin password, timezone and port, writes `web/.env` with a
-random session secret, then starts Docker Compose. Open the printed LAN URL and
-sign in. The dashboard starts with no employees or devices, so it is ready for
-your organisation rather than demo data.
+It downloads the repository into `./TimeTone`, asks whether to use Docker or a
+native Node.js install, then asks for an admin password, timezone and port. Open
+the printed LAN URL and sign in. To use an existing checkout, run
+`./install.sh`; explicit modes are `./install.sh --docker` and
+`./install.sh --native`.
 
 For local development instead, the web application requires Node.js 24 and uses Deno for the checked-in lock
 file in this development environment.
