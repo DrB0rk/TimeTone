@@ -26,6 +26,13 @@ WEB_DIR="$ROOT_DIR/web"
 NON_INTERACTIVE=false
 FORCE=false
 MODE=""
+if [ -t 2 ] || [ -r /dev/tty ]; then
+  C_RESET=$(printf '\033[0m'); C_BOLD=$(printf '\033[1m'); C_DIM=$(printf '\033[2m'); C_GREEN=$(printf '\033[32m'); C_CYAN=$(printf '\033[36m'); C_YELLOW=$(printf '\033[33m'); C_RED=$(printf '\033[31m'); C_BLUE=$(printf '\033[34m')
+else
+  C_RESET=""; C_BOLD=""; C_DIM=""; C_GREEN=""; C_CYAN=""; C_YELLOW=""; C_RED=""; C_BLUE=""
+fi
+printf '\n%s%sTimeTone%s  %sOffice time, beautifully tracked.%s\n' "$C_BOLD" "$C_CYAN" "$C_RESET" "$C_DIM" "$C_RESET" >&2
+printf '%s────────────────────────────────────────%s\n' "$C_DIM" "$C_RESET" >&2
 for arg in "$@"; do
   case "$arg" in
     --non-interactive) NON_INTERACTIVE=true ;;
@@ -52,11 +59,19 @@ if [ -z "$MODE" ]; then
   if [ "$NON_INTERACTIVE" = true ]; then MODE=docker
   else
     command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1 || DEFAULT_MODE=native
-    printf 'Install mode (docker/native) [%s]: ' "$DEFAULT_MODE" >&2
-    MODE=""
-    if [ -r /dev/tty ]; then IFS= read -r MODE </dev/tty || true; else MODE=""; fi
-  MODE=$(printf '%s' "$MODE" | tr -d '\r' | tr '[:upper:]' '[:lower:]')
-  [ -n "$MODE" ] || MODE=$DEFAULT_MODE
+    printf '\n%s%sChoose an installation mode%s\n' "$C_BOLD" "$C_BLUE" "$C_RESET" >&2
+    printf '  %s[1]%s Docker   %s(recommended for servers)%s\n' "$C_CYAN" "$C_RESET" "$C_DIM" "$C_RESET" >&2
+    printf '  %s[2]%s Native   %s(Node.js process, no Docker)%s\n' "$C_CYAN" "$C_RESET" "$C_DIM" "$C_RESET" >&2
+    if [ "$DEFAULT_MODE" = docker ]; then DEFAULT_CHOICE=1; else DEFAULT_CHOICE=2; fi
+    printf '%sSelection [%s]: %s' "$C_BOLD" "$DEFAULT_CHOICE" "$C_RESET" >&2
+    CHOICE=""
+    if [ -r /dev/tty ]; then IFS= read -r CHOICE </dev/tty || true; else CHOICE=""; fi
+    case "$CHOICE" in
+      1|docker|Docker|DOCKER) MODE=docker ;;
+      2|native|Native|NATIVE) MODE=native ;;
+      "") MODE=$DEFAULT_MODE ;;
+      *) printf '%sInvalid selection; using option %s.%s\n' "$C_YELLOW" "$DEFAULT_CHOICE" "$C_RESET" >&2; MODE=$DEFAULT_MODE ;;
+    esac
   fi
 fi
 case "$MODE" in docker|native) ;; *) printf '%s\n' "Unrecognized install mode; using $DEFAULT_MODE." >&2; MODE=$DEFAULT_MODE ;; esac
@@ -67,7 +82,7 @@ run_root() {
 ensure_base_dependencies() {
   command -v tar >/dev/null 2>&1 && command -v sed >/dev/null 2>&1 && command -v find >/dev/null 2>&1 && return
   if command -v apt-get >/dev/null 2>&1; then
-    printf '%s\n' "Installing required system utilities…"
+    printf '%s▸%s Installing required system utilities…\n' "$C_GREEN" "$C_RESET"
     run_root apt-get update
     run_root apt-get install -y ca-certificates curl tar sed findutils openssl
   else
@@ -80,7 +95,7 @@ ensure_base_dependencies
 if [ "$MODE" = docker ]; then
   if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
     if command -v apt-get >/dev/null 2>&1; then
-      printf '%s\n' "Installing Docker Engine and Compose…"
+      printf '%s▸%s Installing Docker Engine and Compose…\n' "$C_GREEN" "$C_RESET"
       run_root apt-get update
       run_root apt-get install -y docker.io docker-compose-v2 || run_root apt-get install -y docker.io docker-compose-plugin
       if command -v systemctl >/dev/null 2>&1; then run_root systemctl enable --now docker || true; fi
@@ -96,7 +111,7 @@ else
   if command -v node >/dev/null 2>&1; then node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 20 ? 0 : 1)' >/dev/null 2>&1 && NODE_OK=true; fi
   if [ "$NODE_OK" = false ] || ! command -v npm >/dev/null 2>&1; then
     if command -v apt-get >/dev/null 2>&1; then
-      printf '%s\n' "Installing Node.js 24 and npm…"
+      printf '%s▸%s Installing Node.js 24 and npm…\n' "$C_GREEN" "$C_RESET"
       run_root apt-get update
       run_root apt-get install -y ca-certificates curl
       curl -fsSL https://deb.nodesource.com/setup_24.x | run_root sh
@@ -154,7 +169,7 @@ $([ "$MODE" = native ] && printf '%s\n' 'TIMETONE_INSTALL_MODE=native' || true)
 $DATABASE_LINE
 EOF
 
-printf '%s\n' "Installing TimeTone ($MODE)…"
+printf '%s▸%s Installing TimeTone (%s%s%s)…\n' "$C_GREEN" "$C_RESET" "$C_BOLD" "$MODE" "$C_RESET"
 if [ "$MODE" = docker ]; then
   (cd "$WEB_DIR" && docker compose config -q && docker compose up -d --build)
 else
@@ -163,6 +178,6 @@ else
   (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid)
 fi
 HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-printf '\nTimeTone is ready at http://%s:%s\n' "${HOST_IP:-localhost}" "$PORT"
+printf '\n%s%s✓ TimeTone is ready%s at http://%s:%s\n' "$C_BOLD" "$C_GREEN" "$C_RESET" "${HOST_IP:-localhost}" "$PORT"
 [ "$MODE" = native ] && printf '%s\n' "Native logs: $WEB_DIR/timetone.log  |  PID file: $WEB_DIR/timetone.pid"
 printf '%s\n' "For browser-based USB updates, serve this address through HTTPS (or use localhost)."
