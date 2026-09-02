@@ -28,6 +28,7 @@ typedef struct {
     uint16_t screen_off_timeout_seconds;
     uint16_t low_power_timeout_seconds;
     bool power_timeouts_configured;
+    uint16_t full_sync_interval_seconds;
 } tk_config_t;
 
 typedef struct {

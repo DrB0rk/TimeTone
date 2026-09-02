@@ -19,6 +19,7 @@ export function GET(request: Request) {
       roundingMinutes: Number(settings.rounding_minutes),
       roundingMode: settings.rounding_mode,
       syncIntervalSeconds: device.sync_interval_seconds,
+      fullSyncIntervalSeconds: device.full_sync_interval_seconds,
       screenOffTimeoutSeconds: device.screen_off_timeout_seconds,
       lowPowerTimeoutSeconds: device.low_power_timeout_seconds,
       terminalTheme: device.terminal_theme,

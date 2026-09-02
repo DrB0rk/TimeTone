@@ -117,8 +117,9 @@ export async function saveDeviceSettings(formData: FormData) {
   const lowPowerTimeout = z.coerce.number().int().min(0).max(3600).parse(formData.get("low_power_timeout_seconds"));
   if (lowPowerTimeout && screenOffTimeout && lowPowerTimeout < screenOffTimeout) throw new Error("Low-power timeout must be longer than screen-off timeout");
   const syncInterval = z.coerce.number().int().min(2).max(60).parse(formData.get("sync_interval_seconds"));
-  db.prepare("UPDATE devices SET screen_off_timeout_seconds = ?, low_power_timeout_seconds = ?, sync_interval_seconds = ? WHERE id = ?")
-    .run(screenOffTimeout, lowPowerTimeout, syncInterval, id);
+  const fullSyncInterval = z.coerce.number().int().min(30).max(3600).parse(formData.get("full_sync_interval_seconds"));
+  db.prepare("UPDATE devices SET screen_off_timeout_seconds = ?, low_power_timeout_seconds = ?, sync_interval_seconds = ?, full_sync_interval_seconds = ? WHERE id = ?")
+    .run(screenOffTimeout, lowPowerTimeout, syncInterval, fullSyncInterval, id);
   revalidatePath("/devices");
 }
 

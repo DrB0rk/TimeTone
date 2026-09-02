@@ -43,6 +43,7 @@ export type Device = {
   created_at: string;
   approved: number;
   sync_interval_seconds: number;
+  full_sync_interval_seconds: number;
   screen_off_timeout_seconds: number;
   low_power_timeout_seconds: number;
   terminal_theme: string;

@@ -50,6 +50,7 @@ db.exec(`
     ip_address TEXT,
     pending_events INTEGER NOT NULL DEFAULT 0,
     sync_interval_seconds INTEGER NOT NULL DEFAULT 5,
+    full_sync_interval_seconds INTEGER NOT NULL DEFAULT 300,
     sleep_timeout_seconds INTEGER NOT NULL DEFAULT 120,
     screen_off_timeout_seconds INTEGER NOT NULL DEFAULT 30,
     low_power_timeout_seconds INTEGER NOT NULL DEFAULT 120,
@@ -99,6 +100,7 @@ try {
 }
 for (const migration of [
   "ALTER TABLE devices ADD COLUMN sync_interval_seconds INTEGER NOT NULL DEFAULT 5",
+  "ALTER TABLE devices ADD COLUMN full_sync_interval_seconds INTEGER NOT NULL DEFAULT 300",
   "ALTER TABLE devices ADD COLUMN sleep_timeout_seconds INTEGER NOT NULL DEFAULT 120",
   "ALTER TABLE devices ADD COLUMN terminal_theme TEXT NOT NULL DEFAULT 'light'",
   "ALTER TABLE devices ADD COLUMN screen_off_timeout_seconds INTEGER NOT NULL DEFAULT 30",

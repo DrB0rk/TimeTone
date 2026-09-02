@@ -103,6 +103,7 @@ static esp_err_t fetch_config(void)
     cJSON *settings = cJSON_GetObjectItem(root, "settings");
     if (cJSON_IsObject(settings)) {
         cJSON *interval = cJSON_GetObjectItem(settings, "syncIntervalSeconds");
+        cJSON *full_interval = cJSON_GetObjectItem(settings, "fullSyncIntervalSeconds");
         cJSON *screen_off_timeout = cJSON_GetObjectItem(settings, "screenOffTimeoutSeconds");
         cJSON *low_power_timeout = cJSON_GetObjectItem(settings, "lowPowerTimeoutSeconds");
         cJSON *theme = cJSON_GetObjectItem(settings, "terminalTheme");
@@ -113,6 +114,10 @@ static esp_err_t fetch_config(void)
             uint16_t seconds = (uint16_t)(interval->valuedouble < 2 ? 2 : interval->valuedouble > 60 ? 60 : interval->valuedouble);
             s_sync_interval_seconds = seconds;
             if (updated.sync_interval_seconds != seconds) { updated.sync_interval_seconds = seconds; changed = true; }
+        }
+        if (cJSON_IsNumber(full_interval)) {
+            uint16_t seconds = (uint16_t)(full_interval->valuedouble < 30 ? 30 : full_interval->valuedouble > 3600 ? 3600 : full_interval->valuedouble);
+            if (updated.full_sync_interval_seconds != seconds) { updated.full_sync_interval_seconds = seconds; changed = true; }
         }
         if (cJSON_IsNumber(screen_off_timeout) && cJSON_IsNumber(low_power_timeout)) {
             uint16_t screen_seconds = (uint16_t)(screen_off_timeout->valuedouble < 0 ? 0 : screen_off_timeout->valuedouble > 3600 ? 3600 : screen_off_timeout->valuedouble);
@@ -250,7 +255,8 @@ static void api_task(void *argument)
     bool first_sync = true;
     while (true) {
         uint16_t base_seconds = tk_config_get()->sync_interval_seconds ?: s_sync_interval_seconds;
-        bool config_due = first_sync || s_config_elapsed >= 30;
+        uint16_t full_sync_seconds = tk_config_get()->full_sync_interval_seconds ?: 300;
+        bool config_due = first_sync || s_config_elapsed >= full_sync_seconds;
         if (tk_network_connected() && tk_config_get()->configured && !tk_display_is_sleeping()) {
             esp_err_t config_result = ESP_OK;
             if (config_due) {

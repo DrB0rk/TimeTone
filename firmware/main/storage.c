@@ -71,6 +71,7 @@ esp_err_t tk_storage_init(void)
     if (!s_config.touch_x_scale) s_config.touch_x_scale = 1000;
     if (!s_config.touch_y_scale) s_config.touch_y_scale = 1000;
     if (!s_config.sync_interval_seconds) s_config.sync_interval_seconds = 5;
+    if (!s_config.full_sync_interval_seconds) s_config.full_sync_interval_seconds = 300;
     // Existing installations predate this field, so use a sensible screen
     // sleep default until their first device-settings sync arrives.
     if (!s_config.sleep_timeout_configured) s_config.sleep_timeout_seconds = 120;
