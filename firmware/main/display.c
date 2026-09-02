@@ -380,9 +380,11 @@ static void build_clock_ui(void)
     lv_obj_t *brand_mark = ui_card(s_header, 12, 13, 26, 26, 0xD8FF62, 0xD8FF62);
     lv_obj_t *mark_text = ui_text(brand_mark, "T", 0x17211B, 8, 5);
     (void)mark_text;
-    s_brand_label = lv_label_create(s_header); lv_label_set_text(s_brand_label, "TIMETONE"); lv_label_set_long_mode(s_brand_label, LV_LABEL_LONG_DOT); lv_obj_set_width(s_brand_label, 76); lv_obj_set_style_text_color(s_brand_label, lv_color_hex(0xF4F7F2), 0); lv_obj_set_style_text_font(s_brand_label, &lv_font_montserrat_14, 0); lv_obj_align(s_brand_label, LV_ALIGN_LEFT_MID, 46, 0);
-    s_clock_label = lv_label_create(s_header); lv_obj_set_style_text_color(s_clock_label, lv_color_white(), 0); lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0); lv_obj_align(s_clock_label, LV_ALIGN_CENTER, 0, 0);
-    s_status_dot = lv_led_create(s_header); lv_obj_set_size(s_status_dot, 10, 10); lv_obj_set_style_radius(s_status_dot, LV_RADIUS_CIRCLE, 0); lv_led_set_color(s_status_dot, lv_color_hex(0x788078)); lv_led_on(s_status_dot); lv_obj_align(s_status_dot, LV_ALIGN_RIGHT_MID, -56, 0);
+    // The header uses fixed, non-overlapping zones: identity, clock, state,
+    // then settings.  Company names are clipped instead of wrapping.
+    s_brand_label = lv_label_create(s_header); lv_label_set_text(s_brand_label, "TIMETONE"); lv_label_set_long_mode(s_brand_label, LV_LABEL_LONG_CLIP); lv_obj_set_size(s_brand_label, 76, 18); lv_obj_set_style_text_color(s_brand_label, lv_color_hex(0xF4F7F2), 0); lv_obj_set_style_text_font(s_brand_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_brand_label, 46, 17);
+    s_clock_label = lv_label_create(s_header); lv_obj_set_size(s_clock_label, 48, 18); lv_label_set_long_mode(s_clock_label, LV_LABEL_LONG_CLIP); lv_obj_set_style_text_align(s_clock_label, LV_TEXT_ALIGN_CENTER, 0); lv_obj_set_style_text_color(s_clock_label, lv_color_white(), 0); lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_clock_label, 126, 17);
+    s_status_dot = lv_led_create(s_header); lv_obj_set_size(s_status_dot, 10, 10); lv_obj_set_style_radius(s_status_dot, LV_RADIUS_CIRCLE, 0); lv_led_set_color(s_status_dot, lv_color_hex(0x788078)); lv_led_on(s_status_dot); lv_obj_set_pos(s_status_dot, 181, 21);
     lv_obj_t *settings = lv_button_create(s_header); lv_obj_set_size(settings, 36, 34); lv_obj_align(settings, LV_ALIGN_RIGHT_MID, -8, 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x26352C), 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x405249), LV_STATE_PRESSED); lv_obj_set_style_radius(settings, 12, 0); lv_obj_set_style_border_width(settings, 1, 0); lv_obj_set_style_border_color(settings, lv_color_hex(0x405249), 0); lv_obj_add_event_cb(settings, open_settings_event, LV_EVENT_CLICKED, NULL);
     // LVGL ships this Font Awesome settings glyph with Montserrat 14.  Using
     // the bundled icon font is more reliable than composing a cog from child
@@ -409,12 +411,14 @@ static void build_clock_ui(void)
         lv_obj_set_style_bg_color(button, lv_color_hex(colors[i]), 0); lv_obj_set_style_bg_color(button, lv_color_hex(0xFFFFFF), LV_STATE_PRESSED); lv_obj_set_style_radius(button, 14, 0); lv_obj_set_style_border_width(button, 0, 0); lv_obj_set_style_shadow_width(button, 5, 0); lv_obj_set_style_shadow_color(button, lv_color_hex(0x101813), 0); lv_obj_set_style_shadow_opa(button, LV_OPA_30, 0); lv_obj_add_event_cb(button, keypad_button_event, LV_EVENT_CLICKED, (void *)keys[i]);
     }
     lv_obj_t *clear = lv_button_create(s_main_screen);
-    lv_obj_set_size(clear, 212, 28); lv_obj_set_pos(clear, 14, 278);
+    lv_obj_set_size(clear, 212, 32); lv_obj_set_pos(clear, 14, 282);
     lv_obj_set_style_bg_color(clear, lv_color_hex(0x26352C), 0); lv_obj_set_style_bg_color(clear, lv_color_hex(0x405249), LV_STATE_PRESSED);
     lv_obj_set_style_text_color(clear, lv_color_hex(0xD3DED4), 0); lv_obj_set_style_text_font(clear, &lv_font_montserrat_14, 0); lv_obj_set_style_radius(clear, 10, 0); lv_obj_set_style_border_width(clear, 1, 0); lv_obj_set_style_border_color(clear, lv_color_hex(0x405249), 0);
     lv_obj_add_event_cb(clear, clear_keypad_event, LV_EVENT_CLICKED, NULL);
     lv_obj_t *clear_label = lv_label_create(clear); lv_label_set_text(clear_label, "CLEAR"); lv_obj_center(clear_label);
-    s_count_label = lv_label_create(s_main_screen); lv_obj_set_style_text_color(s_count_label, lv_color_hex(0x788078), 0); lv_obj_set_style_text_font(s_count_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_count_label, 14, 307);
+    // The compact bottom footer used to clip against the physical display
+    // edge; the clear action is more valuable in that space.
+    s_count_label = lv_label_create(s_main_screen); lv_obj_add_flag(s_count_label, LV_OBJ_FLAG_HIDDEN);
     set_status("Ready", 0x168455); update_pin_label();
     lv_timer_create(clock_timer, 1000, NULL); clock_timer(NULL);
     lv_timer_create(sync_animation_timer, 420, NULL);

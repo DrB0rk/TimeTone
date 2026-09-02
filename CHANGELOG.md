@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.16] - 2026-09-02
+
+- Prevent company names and the clock from colliding in the terminal header.
+- Reclaim the clipped bottom footer for a larger, easier-to-tap clear action.
+
 ## [0.2.15] - 2026-09-02
 
 - Modernize the terminal home, startup, offline setup, settings, and local browser-configuration experiences.
