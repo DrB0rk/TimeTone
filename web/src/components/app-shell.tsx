@@ -104,10 +104,14 @@ export function AppShell(
               </Link>
             ))}
           </nav>
-          <div className="ml-auto hidden items-center gap-2 text-sm text-black/50 dark:text-white/55 lg:flex">
+          <div className="ml-auto hidden items-center gap-2 text-sm text-black/50 dark:text-white/55 sm:flex">
             <span className="size-2 rounded-full bg-emerald-500" />System
             operational
           </div>
+          <span className="ml-auto rounded-lg border border-black/8 px-2 py-1 text-[11px] font-semibold tracking-wide text-black/45 dark:border-white/10 dark:text-white/55 lg:hidden">v{version}</span>
+          <a href="https://github.com/DrB0rk/TimeTone/issues/new" target="_blank" rel="noreferrer" className="ml-2 rounded-lg p-2 text-black/45 transition hover:bg-black/5 hover:text-black dark:text-white/55 dark:hover:bg-white/8 dark:hover:text-white sm:hidden" aria-label="Send feedback">
+            <MessageSquarePlus className="size-4" />
+          </a>
           <button onClick={toggleTheme} className="ml-3 grid size-9 place-items-center rounded-xl border border-black/10 bg-white text-black/60 transition duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-white/8 dark:text-white/75" aria-label="Toggle color theme">
             {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </button>
