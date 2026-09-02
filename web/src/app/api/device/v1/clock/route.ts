@@ -4,7 +4,6 @@ import {
   db,
   getSettings,
   processClockEvent,
-  runTimeMaintenance,
   sha256,
 } from "@/lib/db";
 import { publishLiveUpdate } from "@/lib/live-updates";
@@ -22,7 +21,8 @@ export async function POST(request: Request) {
     .get(sha256(parsed.data.code)) as { id: string; name: string } | undefined;
   if (!employee) return Response.json({ ok: false, error: "invalid_code" }, { status: 404 });
   const now = new Date().toISOString();
-  runTimeMaintenance(new Date(now));
+  // This endpoint is the terminal's interactive fast path. Historical
+  // maintenance runs from dashboard/report reads and must never delay a tap.
   const open = db.prepare("SELECT id FROM time_entries WHERE employee_id = ? AND clock_out IS NULL")
     .get(employee.id) as { id: string } | undefined;
   const settings = getSettings();

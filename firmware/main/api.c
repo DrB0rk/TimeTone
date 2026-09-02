@@ -9,6 +9,7 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -25,6 +26,7 @@ static uint32_t s_config_elapsed;
 static volatile bool s_force_config;
 static TickType_t s_next_pair_attempt;
 static TickType_t s_next_config_attempt;
+static volatile bool s_clock_request_in_flight;
 
 typedef struct { char *data; size_t length; size_t capacity; } response_buffer_t;
 static void ota_task(void *argument);
@@ -59,7 +61,10 @@ static int request(const char *path, esp_http_client_method_t method, const char
         // A tiny heartbeat timeout caused otherwise healthy terminals to flap
         // on busy Wi-Fi. These limits stay bounded while allowing a full
         // connection setup to complete reliably.
-        .timeout_ms = strstr(path, "/heartbeat") ? 8000 : strstr(path, "/clock") ? 10000 : strstr(path, "/events") ? 10000 : 15000,
+        // Clock requests are the interactive path. Four and a half seconds is
+        // enough for DNS/TLS on the supported networks, while a dead route
+        // fails quickly instead of leaving the next person waiting for 10s.
+        .timeout_ms = strstr(path, "/heartbeat") ? 8000 : strstr(path, "/clock") ? 4500 : strstr(path, "/events") ? 10000 : 15000,
         .keep_alive_enable = true,
         .event_handler = http_event,
         .user_data = &buffer,
@@ -74,13 +79,16 @@ static int request(const char *path, esp_http_client_method_t method, const char
     esp_http_client_set_header(client, "Accept", "application/json");
     esp_http_client_set_header(client, "User-Agent", "TimeTone-Terminal/" TK_FIRMWARE_VERSION);
     if (body) esp_http_client_set_post_field(client, body, strlen(body));
+    int64_t started_us = esp_timer_get_time();
     esp_err_t err = esp_http_client_perform(client);
     // A 401 response can make esp_http_client return ESP_ERR_NOT_SUPPORTED
     // before ESP_OK (it attempts an auth challenge). Preserve the HTTP status
     // so the pairing handshake can still run for a new token.
     int status = esp_http_client_get_status_code(client);
     if (status <= 0) status = err == ESP_OK ? 200 : -1;
-    if (err != ESP_OK) ESP_LOGW(TAG, "%s failed: %s", path, esp_err_to_name(err));
+    int64_t elapsed_ms = (esp_timer_get_time() - started_us) / 1000;
+    if (err != ESP_OK) ESP_LOGW(TAG, "%s failed after %lldms: %s", path, elapsed_ms, esp_err_to_name(err));
+    else if (strstr(path, "/clock") && elapsed_ms > 1000) ESP_LOGW(TAG, "slow clock request: %lldms", elapsed_ms);
     esp_http_client_cleanup(client);
     return status;
 }
@@ -196,7 +204,9 @@ esp_err_t tk_api_submit_code(const char *code, char employee_name[48], bool *clo
     char body[96];
     snprintf(body, sizeof(body), "{\"code\":\"%s\"}", code);
     char response[512];
+    s_clock_request_in_flight = true;
     int status = request("/api/device/v1/clock", HTTP_METHOD_POST, body, response, sizeof(response));
+    s_clock_request_in_flight = false;
     if (status == 404) return ESP_ERR_NOT_FOUND;
     if (status == 401) return ESP_ERR_INVALID_STATE;
     if (status != 200) return ESP_FAIL;
@@ -288,7 +298,7 @@ static void api_task(void *argument)
         uint16_t full_sync_seconds = tk_config_get()->full_sync_interval_seconds ?: 300;
         bool config_due = (first_sync || s_force_config || s_config_elapsed >= full_sync_seconds) &&
             xTaskGetTickCount() >= s_next_config_attempt;
-        if (tk_network_connected() && tk_config_get()->configured && !tk_display_is_sleeping()) {
+        if (tk_network_connected() && tk_config_get()->configured && !tk_display_is_sleeping() && !s_clock_request_in_flight) {
             // The short interval is a genuine health check. Do not start a
             // full download or event upload until authentication is known to
             // be valid, which avoids long timeouts and misleading status loops.

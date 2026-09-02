@@ -3,6 +3,12 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.18] - 2026-09-02
+
+- Remove full historical maintenance scans from the terminal's interactive clock endpoint.
+- Prioritize code submissions over background health traffic and bound clock-request failures to 4.5 seconds.
+- Add terminal-side timing diagnostics for clock requests slower than one second.
+
 ## [0.2.17] - 2026-09-02
 
 - Remove the non-interactive colour-code dot field and expand the terminal keypad.

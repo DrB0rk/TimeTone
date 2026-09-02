@@ -332,6 +332,18 @@ export const runTimeMaintenance = db.transaction((now = new Date()) => {
   return { merged, closed };
 });
 
+// Clock-ins are a latency-sensitive interaction.  The full maintenance pass
+// walks historical entries and is intentionally kept out of that request
+// path; it is still performed by dashboard reads and, at most, once a minute
+// when a terminal clocks someone in or out.
+let lastMaintenanceAt = 0;
+export function runTimeMaintenanceIfDue(now = new Date(), minimumIntervalMs = 60_000) {
+  const timestamp = now.getTime();
+  if (timestamp - lastMaintenanceAt < minimumIntervalMs) return { merged: 0, closed: 0, skipped: true };
+  lastMaintenanceAt = timestamp;
+  return { ...runTimeMaintenance(now), skipped: false };
+}
+
 export const processClockEvent = db.transaction((
   deviceId: string,
   employeeId: string,

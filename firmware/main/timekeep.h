@@ -5,7 +5,7 @@
 
 #define TK_MAX_EMPLOYEES 32
 #define TK_MAX_EVENTS 48
-#define TK_FIRMWARE_VERSION "0.2.17"
+#define TK_FIRMWARE_VERSION "0.2.18"
 
 typedef struct {
     char ssid[33];

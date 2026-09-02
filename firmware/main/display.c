@@ -218,9 +218,9 @@ static void code_submit_task(void *argument)
     else if (err == ESP_OK) {
         char message[96]; snprintf(message, sizeof(message), "%s, %s!", clocked_in ? "Welcome" : "Goodbye", employee_name);
         set_status(message, clocked_in ? 0x168455 : 0x526159);
-        // A clock response already proves server health. Wake the health loop
-        // without forcing an expensive employee/config refresh after each tap.
-        tk_api_poke();
+        // The successful clock response already proves connectivity. Let the
+        // normal health cadence resume rather than starting another request
+        // immediately after the interactive one.
     } else set_status("Could not reach server - try again", 0xC47B24);
     _lock_release(&s_lvgl_lock);
     vTaskDelete(NULL);
