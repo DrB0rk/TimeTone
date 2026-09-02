@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.1] - 2026-09-02
+
+- Add animated connecting and syncing state feedback on terminals.
+- Keep offline, connecting, syncing, and online states distinct during retries.
+
 ## [0.2.0] - 2026-09-02
 
 - Add secure HTTPS OTA firmware updates from approved GitHub release assets.
