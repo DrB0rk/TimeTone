@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { Cpu, Pencil, Plus, SlidersHorizontal } from "lucide-react";
-import { approveDevice, rejectDevice, renameDevice, requestFirmwareUpdate, saveDeviceSettings } from "@/app/actions";
+import { approveDevice, rejectDevice, renameDevice, requestDeviceSync, requestFirmwareUpdate, saveDeviceSettings } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
 import { UsbFirmwareUpdater } from "@/components/usb-firmware-updater";
 import { Badge } from "@/components/ui/badge";
@@ -122,6 +122,10 @@ export default async function DevicesPage() {
                         </select>
                       </label>
                       <Button type="submit" size="sm" className="sm:col-span-2 bg-[#17211b] text-white hover:bg-[#26352c]">Save device settings</Button>
+                    </form>
+                    <form action={requestDeviceSync} className="mt-3">
+                      <input type="hidden" name="id" value={device.id} />
+                      <Button type="submit" size="sm" variant="outline" className="w-full">Fetch employees &amp; settings now</Button>
                     </form>
                   </details>
                 )}

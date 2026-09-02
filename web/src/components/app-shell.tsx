@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  MessageSquarePlus,
   Users,
   Moon,
   Sun,
@@ -70,8 +71,11 @@ export function AppShell(
             );
           })}
         </nav>
-        <div className="px-6 pb-3 text-[11px] font-medium tracking-wide text-white/35">TimeTone v{version}</div>
+        <div className="px-6 pb-3 text-[11px] font-semibold tracking-wide text-white/55">TimeTone v{version}</div>
         <form action={logout} className="border-t border-white/10 p-4">
+          <a href="https://github.com/DrB0rk/TimeTone/issues/new" target="_blank" rel="noreferrer" className="mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/60 transition hover:bg-white/8 hover:text-white">
+            <MessageSquarePlus className="size-4" />Feedback
+          </a>
           <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/60 transition hover:bg-white/8 hover:text-white">
             <LogOut className="size-4" />Sign out
           </button>

@@ -50,6 +50,7 @@ export type Device = {
   ota_version: string | null;
   ota_url: string | null;
   ota_requested_at: string | null;
+  sync_requested_at: string | null;
 };
 
 export type AppSettings = {

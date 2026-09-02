@@ -15,7 +15,8 @@ export default async function SettingsPage(
   return (
     <>
       <PageHeading eyebrow="Workspace controls" title="Settings" description="Keep attendance rules transparent, terminals responsive, and reporting consistent." />
-      <form action={saveSettings} className="max-w-4xl space-y-6">
+      <form action={saveSettings} className="max-w-6xl space-y-6">
+        <div className="grid gap-6 lg:grid-cols-2">
         <SettingsSection icon={Settings2} title="Workspace" description="How the workspace appears across reports and terminals.">
           <div className="grid gap-5 sm:grid-cols-2">
             <Field label="Company name" name="company_name" defaultValue={settings.company_name} />
@@ -46,6 +47,7 @@ export default async function SettingsPage(
             <SelectField label="Default report window" name="default_report_window" value={settings.default_report_window} options={[["7", "7 days"], ["14", "14 days"], ["30", "30 days"], ["60", "2 months"], ["90", "90 days"], ["365", "12 months"]]} />
           </div>
         </SettingsSection>
+        </div>
         <Button type="submit" size="lg" className="bg-[#17211b] text-white hover:bg-[#26352c]"><Save className="size-4" />Save workspace settings</Button>
       </form>
 

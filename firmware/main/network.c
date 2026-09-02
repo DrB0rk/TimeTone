@@ -226,8 +226,12 @@ esp_err_t tk_network_init(void)
         strlcpy((char *)station.sta.ssid, stored->ssid, sizeof(station.sta.ssid));
         strlcpy((char *)station.sta.password, stored->wifi_password, sizeof(station.sta.password));
         station.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+        station.sta.scan_method = WIFI_FAST_SCAN;
+        station.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+        station.sta.listen_interval = 3;
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &station));
     } else ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
     ESP_RETURN_ON_ERROR(esp_wifi_start(), TAG, "wifi start");
     // Keep the configuration portal available through the station IP as well
     // as the fallback setup access point.

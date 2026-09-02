@@ -77,6 +77,10 @@ The installer asks for:
 
 It finishes with a health check and prints the exact LAN URL and port.
 
+Native installs download the production bundle attached to the latest GitHub
+release, so Node.js users do not need to compile the dashboard locally. Docker
+deployments use the included production Dockerfile and persistent data volume.
+
 Choose a mode explicitly:
 
 ```bash

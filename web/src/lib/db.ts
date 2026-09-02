@@ -58,6 +58,7 @@ db.exec(`
     ota_version TEXT,
     ota_url TEXT,
     ota_requested_at TEXT,
+    sync_requested_at TEXT,
     created_at TEXT NOT NULL,
     approved INTEGER NOT NULL DEFAULT 1
   );
@@ -108,6 +109,7 @@ for (const migration of [
   "ALTER TABLE devices ADD COLUMN ota_version TEXT",
   "ALTER TABLE devices ADD COLUMN ota_url TEXT",
   "ALTER TABLE devices ADD COLUMN ota_requested_at TEXT",
+  "ALTER TABLE devices ADD COLUMN sync_requested_at TEXT",
 ]) {
   try { db.exec(migration); } catch { /* column already exists */ }
 }

@@ -123,6 +123,14 @@ export async function saveDeviceSettings(formData: FormData) {
   revalidatePath("/devices");
 }
 
+export async function requestDeviceSync(formData: FormData) {
+  await requireAuth();
+  const id = z.string().uuid().parse(formData.get("id"));
+  db.prepare("UPDATE devices SET sync_requested_at = ? WHERE id = ? AND approved = 1")
+    .run(new Date().toISOString(), id);
+  revalidatePath("/devices");
+}
+
 export async function requestFirmwareUpdate(formData: FormData) {
   await requireAuth();
   const id = z.string().uuid().parse(formData.get("id"));

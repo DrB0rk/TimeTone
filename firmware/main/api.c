@@ -22,6 +22,7 @@ static uint16_t s_sync_interval_seconds = 5;
 static bool s_ota_in_progress;
 static uint8_t s_sync_failures;
 static uint32_t s_config_elapsed;
+static volatile bool s_force_config;
 
 typedef struct { char *data; size_t length; size_t capacity; } response_buffer_t;
 static void ota_task(void *argument);
@@ -244,6 +245,13 @@ static void heartbeat(void)
     snprintf(body, sizeof(body), "{\"firmwareVersion\":\"%s\",\"ipAddress\":\"%s\",\"pendingEvents\":%d}", TK_FIRMWARE_VERSION, ip, pending);
     char response[256];
     int status = request("/api/device/v1/heartbeat", HTTP_METHOD_POST, body, response, sizeof(response));
+    if (status == 200) {
+        cJSON *root = cJSON_Parse(response);
+        if (root) {
+            if (cJSON_IsTrue(cJSON_GetObjectItem(root, "configRefresh"))) s_force_config = true;
+            cJSON_Delete(root);
+        }
+    }
     if (status == 401) {
         char pair_body[320];
         snprintf(pair_body, sizeof(pair_body), "{\"deviceName\":\"%s\",\"token\":\"%s\",\"firmwareVersion\":\"%s\",\"ipAddress\":\"%s\"}", tk_network_setup_ssid(), tk_config_get()->device_token, TK_FIRMWARE_VERSION, ip);
@@ -255,11 +263,11 @@ static void heartbeat(void)
 
 static void api_task(void *argument)
 {
-    bool first_sync = true;
+    bool first_sync = false;
     while (true) {
         uint16_t base_seconds = tk_config_get()->sync_interval_seconds ?: s_sync_interval_seconds;
         uint16_t full_sync_seconds = tk_config_get()->full_sync_interval_seconds ?: 300;
-        bool config_due = first_sync || s_config_elapsed >= full_sync_seconds;
+        bool config_due = first_sync || s_force_config || s_config_elapsed >= full_sync_seconds;
         if (tk_network_connected() && tk_config_get()->configured && !tk_display_is_sleeping()) {
             esp_err_t config_result = ESP_OK;
             if (config_due) {
@@ -270,6 +278,7 @@ static void api_task(void *argument)
                 config_result = fetch_config();
                 s_config_elapsed = 0;
                 first_sync = false;
+                s_force_config = false;
             }
             push_events();
             // The short interval is a real health check: keep the terminal's
@@ -300,4 +309,4 @@ esp_err_t tk_api_start(void)
     return xTaskCreate(api_task, "timekeep_api", 8192, NULL, 4, NULL) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }
 
-void tk_api_wake(void) { if (s_wake) xSemaphoreGive(s_wake); }
+void tk_api_wake(void) { s_force_config = true; if (s_wake) xSemaphoreGive(s_wake); }

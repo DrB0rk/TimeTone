@@ -35,13 +35,29 @@ if [ ! -f "$SCRIPT_DIR/web/package.json" ]; then
   [ -d "$INSTALL_DIR/web" ] || {
     TMP_DIR=$(mktemp -d)
     trap 'rm -rf "$TMP_DIR"' EXIT HUP INT TERM
-    printf '%s\n' "Downloading the latest TimeTone release…"
-    curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/refs/heads/main?cachebust=$(date +%s)" -o "$TMP_DIR/timetone.tar.gz"
-    mkdir -p "$TMP_DIR/source"
-    tar -xzf "$TMP_DIR/timetone.tar.gz" -C "$TMP_DIR/source"
-    SOURCE_DIR=$(find "$TMP_DIR/source" -mindepth 1 -maxdepth 1 -type d | head -n 1)
     mkdir -p "$INSTALL_DIR"
-    cp -R "$SOURCE_DIR"/. "$INSTALL_DIR"/
+    REQUEST_NATIVE=false
+    for arg in "$@"; do [ "$arg" = "--native" ] && REQUEST_NATIVE=true; done
+    if [ "$REQUEST_NATIVE" = true ]; then
+      printf '%s\n' "Downloading the latest prebuilt TimeTone web release…"
+      if curl -fsSL "https://github.com/DrB0rk/TimeTone/releases/latest/download/timetone-web.tar.gz?cachebust=$(date +%s)" -o "$TMP_DIR/timetone-web.tar.gz"; then
+        tar -xzf "$TMP_DIR/timetone-web.tar.gz" -C "$INSTALL_DIR"
+      else
+        printf '%s\n' "Prebuilt release unavailable; downloading the source fallback…"
+        curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/refs/heads/main?cachebust=$(date +%s)" -o "$TMP_DIR/timetone.tar.gz"
+        mkdir -p "$TMP_DIR/source"
+        tar -xzf "$TMP_DIR/timetone.tar.gz" -C "$TMP_DIR/source"
+        SOURCE_DIR=$(find "$TMP_DIR/source" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+        cp -R "$SOURCE_DIR"/. "$INSTALL_DIR"/
+      fi
+    else
+      printf '%s\n' "Downloading the latest TimeTone source release…"
+      curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/refs/heads/main?cachebust=$(date +%s)" -o "$TMP_DIR/timetone.tar.gz"
+      mkdir -p "$TMP_DIR/source"
+      tar -xzf "$TMP_DIR/timetone.tar.gz" -C "$TMP_DIR/source"
+      SOURCE_DIR=$(find "$TMP_DIR/source" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+      cp -R "$SOURCE_DIR"/. "$INSTALL_DIR"/
+    fi
   }
   # Always refresh the entrypoint, including when a previous failed install
   # already created INSTALL_DIR. This avoids rerunning a stale cached script.
@@ -194,9 +210,13 @@ if [ "$UPDATE" = true ]; then
   if [ "$MODE" = docker ]; then
     (cd "$WEB_DIR" && docker compose config -q && docker compose up -d --build)
   else
-    (cd "$WEB_DIR" && npm install --no-audit --no-fund && npm run build)
+    if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then
+      printf '%s\n' "Using the prebuilt web bundle (no local build required)."
+    else
+      (cd "$WEB_DIR" && npm install --no-audit --no-fund && npm run build)
+    fi
     if [ -f "$WEB_DIR/timetone.pid" ] && kill -0 "$(cat "$WEB_DIR/timetone.pid")" 2>/dev/null; then kill "$(cat "$WEB_DIR/timetone.pid")" 2>/dev/null || true; fi
-    (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid)
+    if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid); fi
   fi
   show_status || true
   printf '%s\n' "Configuration and database preserved." >&2
@@ -209,7 +229,7 @@ if [ -f "$WEB_DIR/.env" ] && [ "$FORCE" = false ] && [ "$NON_INTERACTIVE" = fals
   case "$replace" in y|Y|yes|YES) ;; *)
     printf '%s\n' "Kept existing configuration. Starting TimeTone…"
     if [ "$MODE" = docker ]; then (cd "$WEB_DIR" && docker compose up -d --build)
-    else (cd "$WEB_DIR" && npm run build >/dev/null && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 &)
+    else if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 &); else (cd "$WEB_DIR" && npm run build >/dev/null && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 &); fi
     fi
     show_status || true
     exit 0 ;;
@@ -247,9 +267,13 @@ printf '%s▸%s Installing TimeTone (%s%s%s)…\n' "$C_GREEN" "$C_RESET" "$C_BOL
 if [ "$MODE" = docker ]; then
   (cd "$WEB_DIR" && docker compose config -q && docker compose up -d --build)
 else
-  (cd "$WEB_DIR" && npm install && npm run build)
+  if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then
+    printf '%s\n' "Using the prebuilt web bundle (no local build required)."
+  else
+    (cd "$WEB_DIR" && npm install && npm run build)
+  fi
   if [ -f "$WEB_DIR/timetone.pid" ] && kill -0 "$(cat "$WEB_DIR/timetone.pid")" 2>/dev/null; then kill "$(cat "$WEB_DIR/timetone.pid")" 2>/dev/null || true; fi
-  (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid)
+  if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid); fi
 fi
 show_status || true
 [ "$MODE" = native ] && printf '%s\n' "Native logs: $WEB_DIR/timetone.log  |  PID file: $WEB_DIR/timetone.pid"

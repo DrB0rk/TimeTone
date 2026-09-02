@@ -300,6 +300,12 @@ static void show_main_screen(void)
 }
 
 static void settings_back_event(lv_event_t *event) { show_main_screen(); }
+static void settings_sync_event(lv_event_t *event)
+{
+    (void)event;
+    tk_api_wake();
+    set_status("Sync requested", 0x3D8BFD);
+}
 
 static void settings_theme_event(lv_event_t *event)
 {
@@ -431,8 +437,8 @@ static void build_settings_ui(void)
     s_server_label = lv_label_create(s_settings_screen); lv_obj_set_width(s_server_label, 204); lv_label_set_long_mode(s_server_label, LV_LABEL_LONG_DOT); lv_obj_set_style_text_color(s_server_label, lv_color_hex(0xA9B6A9), 0); lv_obj_set_style_text_font(s_server_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_server_label, 18, 86); lv_label_set_text(s_server_label, "Server: not configured");
     settings_button(s_settings_screen, "TOGGLE LIGHT / DARK", 110, settings_theme_event);
     settings_button(s_settings_screen, "CALIBRATE TOUCH", 160, settings_calibrate_event);
-    lv_obj_t *hint_card = lv_obj_create(s_settings_screen); lv_obj_remove_style_all(hint_card); lv_obj_set_size(hint_card, 204, 48); lv_obj_set_pos(hint_card, 18, 212); lv_obj_set_style_bg_color(hint_card, lv_color_hex(0x26352C), 0); lv_obj_set_style_radius(hint_card, 12, 0);
-    s_calibration_hint = lv_label_create(hint_card); lv_label_set_text(s_calibration_hint, "Calibration uses 4 corner taps."); lv_obj_set_style_text_font(s_calibration_hint, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(s_calibration_hint, lv_color_white(), 0); lv_obj_set_pos(s_calibration_hint, 12, 16);
+    settings_button(s_settings_screen, "SYNC NOW", 210, settings_sync_event);
+    s_calibration_hint = lv_label_create(s_settings_screen); lv_label_set_text(s_calibration_hint, "Calibration uses 4 corner taps."); lv_obj_set_style_text_font(s_calibration_hint, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(s_calibration_hint, lv_color_hex(0xA9B6A9), 0); lv_obj_set_pos(s_calibration_hint, 18, 255);
     settings_button(s_settings_screen, "BACK", 274, settings_back_event);
 }
 

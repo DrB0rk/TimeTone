@@ -15,8 +15,9 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return Response.json({ error: "Invalid payload" }, { status: 400 });
   }
+  const syncRequested = !!device.sync_requested_at;
   db.prepare(
-    "UPDATE devices SET last_seen_at = ?, firmware_version = ?, ip_address = ?, pending_events = ?, ota_version = CASE WHEN ota_version = ? THEN NULL ELSE ota_version END, ota_url = CASE WHEN ota_version = ? THEN NULL ELSE ota_url END, ota_requested_at = CASE WHEN ota_version = ? THEN NULL ELSE ota_requested_at END WHERE id = ?",
+    "UPDATE devices SET last_seen_at = ?, firmware_version = ?, ip_address = ?, pending_events = ?, sync_requested_at = NULL, ota_version = CASE WHEN ota_version = ? THEN NULL ELSE ota_version END, ota_url = CASE WHEN ota_version = ? THEN NULL ELSE ota_url END, ota_requested_at = CASE WHEN ota_version = ? THEN NULL ELSE ota_requested_at END WHERE id = ?",
   ).run(
     new Date().toISOString(),
     parsed.data.firmwareVersion,
@@ -27,5 +28,5 @@ export async function POST(request: Request) {
     parsed.data.firmwareVersion,
     device.id,
   );
-  return Response.json({ ok: true, serverTime: new Date().toISOString() });
+  return Response.json({ ok: true, serverTime: new Date().toISOString(), configRefresh: syncRequested });
 }

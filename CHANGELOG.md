@@ -3,6 +3,15 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.8] - 2026-09-02
+
+- Speed up terminal startup by making health checks independent from full configuration downloads.
+- Trigger a full employee/settings refresh after wake or with the new Sync now controls.
+- Improve Wi-Fi fast-scan and connection stability settings.
+- Add a clearer terminal settings layout and manual sync action.
+- Add a visible sidebar version and GitHub feedback link.
+- Publish a prebuilt production web bundle for native installs.
+
 ## [0.2.7] - 2026-09-02
 
 - Complete a dashboard UI/UX consistency pass across light and dark themes.
