@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.11] - 2026-09-02
+
+- Harden dashboard software updates with install-root discovery and actionable API errors.
+- Prevent update requests from surfacing as opaque proxy errors.
+
 ## [0.2.10] - 2026-09-02
 
 - Remove browser USB firmware flashing from the dashboard.
