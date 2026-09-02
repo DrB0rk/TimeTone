@@ -59,7 +59,7 @@ stop_before_update() {
 # the user's .env and persistent data in place.
 if [ -f "$SCRIPT_DIR/web/.env" ] && [ "${TIMETONE_UPDATE_IN_PROGRESS:-}" != 1 ]; then
   case " $* " in
-    *" --help "*) ;;
+    *" --help "*|*" --reset-password "*) ;;
     *)
       command -v curl >/dev/null 2>&1 || { printf '%s\n' "curl is required to update TimeTone." >&2; exit 1; }
       TMP_UPDATE=$(mktemp -d)
@@ -135,6 +135,7 @@ WEB_DIR="$ROOT_DIR/web"
 NON_INTERACTIVE=false
 FORCE=false
 UPDATE=false
+RESET_PASSWORD=false
 MODE=""
 if [ -t 2 ] || [ -r /dev/tty ]; then
   C_RESET=$(printf '\033[0m'); C_BOLD=$(printf '\033[1m'); C_DIM=$(printf '\033[2m'); C_GREEN=$(printf '\033[32m'); C_CYAN=$(printf '\033[36m'); C_YELLOW=$(printf '\033[33m'); C_RED=$(printf '\033[31m'); C_BLUE=$(printf '\033[34m')
@@ -147,10 +148,11 @@ for arg in "$@"; do
   case "$arg" in
     --non-interactive) NON_INTERACTIVE=true ;;
     --update) UPDATE=true ;;
+    --reset-password) RESET_PASSWORD=true ;;
     --native) MODE=native ;;
     --docker) MODE=docker ;;
     --force) FORCE=true ;;
-    -h|--help) printf '%s\n' "Usage: ./install.sh [--docker|--native] [--update] [--non-interactive] [--force]"; exit 0 ;;
+    -h|--help) printf '%s\n' "Usage: ./install.sh [--docker|--native] [--update] [--reset-password] [--non-interactive] [--force]"; exit 0 ;;
     *) printf '%s\n' "Unknown option: $arg" >&2; exit 1 ;;
   esac
 done
@@ -327,6 +329,38 @@ stop_native_server() {
   # replacement runtime starts. Ignore systems without fuser.
   stop_port_processes "$PORT"
 }
+
+if [ "$RESET_PASSWORD" = true ]; then
+  [ -f "$WEB_DIR/.env" ] || { printf '%s\n' "No existing installation was found to reset." >&2; exit 1; }
+  [ "$NON_INTERACTIVE" = true ] && { printf '%s\n' "Password reset requires an interactive terminal." >&2; exit 1; }
+  NEW_PASSWORD=""
+  CONFIRM_PASSWORD=""
+  while [ ${#NEW_PASSWORD} -lt 8 ] || [ "$NEW_PASSWORD" != "$CONFIRM_PASSWORD" ]; do
+    printf 'New admin password (at least 8 characters): ' >&2
+    if [ -r /dev/tty ]; then stty -echo </dev/tty; IFS= read -r NEW_PASSWORD </dev/tty || true; stty echo </dev/tty; else exit 1; fi
+    printf '\nConfirm new admin password: ' >&2
+    if [ -r /dev/tty ]; then stty -echo </dev/tty; IFS= read -r CONFIRM_PASSWORD </dev/tty || true; stty echo </dev/tty; else exit 1; fi
+    printf '\n' >&2
+    [ ${#NEW_PASSWORD} -ge 8 ] || printf '%s\n' "Password must be at least 8 characters." >&2
+    [ "$NEW_PASSWORD" = "$CONFIRM_PASSWORD" ] || printf '%s\n' "Passwords do not match." >&2
+  done
+  RESET_ENV=$(mktemp)
+  umask 077
+  awk -v password="$NEW_PASSWORD" 'BEGIN { updated=0 } /^ADMIN_PASSWORD=/ { print "ADMIN_PASSWORD=" password; updated=1; next } { print } END { if (!updated) print "ADMIN_PASSWORD=" password }' "$WEB_DIR/.env" > "$RESET_ENV"
+  mv "$RESET_ENV" "$WEB_DIR/.env"
+  MODE=$(sed -n 's/^TIMETONE_INSTALL_MODE=//p' "$WEB_DIR/.env" | head -n 1)
+  [ "$MODE" = native ] || MODE=docker
+  printf '%s▸%s Restarting TimeTone with the new password…\n' "$C_GREEN" "$C_RESET" >&2
+  if [ "$MODE" = docker ]; then
+    (cd "$WEB_DIR" && docker compose up -d)
+  else
+    stop_native_server
+    if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid); fi
+  fi
+  show_status || true
+  printf '%s\n' "Password reset complete. Configuration and database preserved." >&2
+  exit 0
+fi
 
 if [ "$UPDATE" = true ]; then
   printf '%s▸%s Updating TimeTone in place (%s%s%s)…\n' "$C_GREEN" "$C_RESET" "$C_BOLD" "$MODE" "$C_RESET"
