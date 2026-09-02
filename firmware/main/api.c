@@ -41,6 +41,7 @@ static esp_err_t http_event(esp_http_client_event_t *event)
 static int request(const char *path, esp_http_client_method_t method, const char *body, char *response, size_t response_size)
 {
     const tk_config_t *config = tk_config_get();
+    if (!config->server_url[0] || (strncmp(config->server_url, "https://", 8) != 0 && strncmp(config->server_url, "http://", 7) != 0)) return -1;
     char url[256];
     snprintf(url, sizeof(url), "%s%s", config->server_url, path);
     response_buffer_t buffer = { .data = response, .capacity = response_size };
@@ -48,7 +49,10 @@ static int request(const char *path, esp_http_client_method_t method, const char
     esp_http_client_config_t client_config = {
         .url = url,
         .method = method,
-        .timeout_ms = 12000,
+        // Keep the 5-second health loop from monopolizing the keypad when a
+        // server is unreachable; larger config payloads retain a longer
+        // timeout for slower networks.
+        .timeout_ms = strstr(path, "/heartbeat") ? 3500 : strstr(path, "/clock") ? 7000 : strstr(path, "/events") ? 7000 : 12000,
         .event_handler = http_event,
         .user_data = &buffer,
         .crt_bundle_attach = esp_crt_bundle_attach,
