@@ -44,15 +44,15 @@ static const char *TAG = "display";
 
 static _lock_t s_lvgl_lock;
 static lv_display_t *s_display;
-static lv_obj_t *s_main_screen, *s_setup_screen, *s_settings_screen, *s_calibration_screen, *s_boot_screen, *s_ota_screen, *s_header;
+static lv_obj_t *s_main_screen, *s_status_screen, *s_setup_screen, *s_settings_screen, *s_calibration_screen, *s_boot_screen, *s_ota_screen, *s_header;
 static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_count_label, *s_brand_label, *s_ip_label, *s_server_label;
 static lv_obj_t *s_status_dot, *s_boot_label, *s_ota_label;
 static lv_obj_t *s_setup_details;
+static lv_obj_t *s_employee_status_list;
 static char s_pin[9];
 static bool s_online;
 static tk_display_network_state_t s_network_state = TK_DISPLAY_OFFLINE;
 static uint8_t s_sync_frame;
-static volatile bool s_entry_in_progress;
 static volatile bool s_starting;
 static volatile bool s_ota_visible;
 static bool s_calibrating, s_calibration_wait_release;
@@ -63,11 +63,15 @@ static volatile bool s_screen_sleeping;
 static volatile bool s_screen_off;
 static bool s_discard_wake_touch;
 static int64_t s_last_activity_us;
+static bool s_touch_down;
+static int s_touch_start_x, s_touch_start_y, s_touch_last_x, s_touch_last_y;
 
 static bool dark_theme(void) { return strcmp(tk_config_get()->terminal_theme, "dark") == 0; }
 static uint32_t bg_color(void) { return dark_theme() ? 0x17211B : 0xF5F6F2; }
-static uint32_t fg_color(void) { return dark_theme() ? 0xF4F7F2 : 0x17211B; }
 static void apply_theme_styles(void);
+static void show_main_screen(void);
+static void show_status_screen(void);
+static void refresh_employee_status_list(void);
 
 static void set_backlight(bool on)
 {
@@ -156,8 +160,27 @@ static void touch_cb(lv_indev_t *indev, lv_indev_data_t *data)
         int adjusted_y = (y[0] * tk_config_get()->touch_y_scale) / 1000 + tk_config_get()->touch_y_offset;
         data->point.x = adjusted_x < 0 ? 0 : adjusted_x >= H_RES ? H_RES - 1 : adjusted_x;
         data->point.y = adjusted_y < 0 ? 0 : adjusted_y >= V_RES ? V_RES - 1 : adjusted_y;
+        if (!s_touch_down) {
+            s_touch_down = true;
+            s_touch_start_x = data->point.x; s_touch_start_y = data->point.y;
+        }
+        s_touch_last_x = data->point.x; s_touch_last_y = data->point.y;
         data->state = LV_INDEV_STATE_PRESSED;
-    } else { s_calibration_wait_release = false; data->state = LV_INDEV_STATE_RELEASED; }
+    } else {
+        // Detect the terminal-wide horizontal gesture before LVGL resolves a
+        // click. It is deliberately generous so normal keypad taps remain
+        // completely unaffected.
+        if (s_touch_down && !s_calibrating) {
+            int dx = s_touch_last_x - s_touch_start_x;
+            int dy = s_touch_last_y - s_touch_start_y;
+            if ((dx > 62 || dx < -62) && (dy < 34 && dy > -34)) {
+                if (dx > 0 && s_main_screen && !lv_obj_has_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN)) show_status_screen();
+                else if (dx < 0 && s_status_screen && !lv_obj_has_flag(s_status_screen, LV_OBJ_FLAG_HIDDEN)) show_main_screen();
+            }
+        }
+        s_touch_down = false;
+        s_calibration_wait_release = false; data->state = LV_INDEV_STATE_RELEASED;
+    }
 }
 
 static void tick_cb(void *argument) { lv_tick_inc(2); }
@@ -206,30 +229,9 @@ static void update_pin_label(void)
     lv_obj_set_style_text_color(s_pin_label, lv_color_hex(hidden[0] ? 0x17211B : 0x788078), 0);
 }
 
-static void code_submit_task(void *argument)
-{
-    char code[8]; strlcpy(code, (const char *)argument, sizeof(code)); free(argument);
-    char employee_name[48] = {0}; bool clocked_in = false;
-    esp_err_t err = tk_api_submit_code(code, employee_name, &clocked_in);
-    _lock_acquire(&s_lvgl_lock);
-    s_entry_in_progress = false;
-    if (err == ESP_ERR_NOT_FOUND) set_status("Code not recognised - try again", 0xC43D3D);
-    else if (err == ESP_ERR_INVALID_STATE || err == ESP_FAIL) set_status("Offline - connect to clock in", 0xC47B24);
-    else if (err == ESP_OK) {
-        char message[96]; snprintf(message, sizeof(message), "%s, %s!", clocked_in ? "Welcome" : "Goodbye", employee_name);
-        set_status(message, clocked_in ? 0x168455 : 0x526159);
-        // The successful clock response already proves connectivity. Let the
-        // normal health cadence resume rather than starting another request
-        // immediately after the interactive one.
-    } else set_status("Could not reach server - try again", 0xC47B24);
-    _lock_release(&s_lvgl_lock);
-    vTaskDelete(NULL);
-}
-
 static void handle_keypress(const char *text)
 {
     if (!text) return;
-    if (s_entry_in_progress) return;
     if (strlen(s_pin) < 4) {
         strlcat(s_pin, text, sizeof(s_pin));
         if (strlen(s_pin) == 4) {
@@ -283,9 +285,6 @@ static void sync_animation_timer(lv_timer_t *timer)
     } else if (s_starting) {
         char text[48]; snprintf(text, sizeof(text), "Starting terminal%s", frames[s_sync_frame++ % 4]);
         lv_label_set_text(s_boot_label, text);
-    } else if (s_entry_in_progress) {
-        char text[32]; snprintf(text, sizeof(text), "Checking code%s", frames[s_sync_frame++ % 4]);
-        set_status(text, 0xC47B24);
     } else if (s_status_dot) {
         // Keep the header compact: the LED itself is the complete status
         // indicator. Connecting/syncing/retrying pulse; online/offline stay
@@ -300,8 +299,18 @@ static void sync_animation_timer(lv_timer_t *timer)
 static void show_main_screen(void)
 {
     lv_obj_clear_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN);
+    if (s_status_screen) lv_obj_add_flag(s_status_screen, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_calibration_screen, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void show_status_screen(void)
+{
+    if (!s_status_screen) return;
+    refresh_employee_status_list();
+    lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(s_status_screen, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void settings_back_event(lv_event_t *event) { show_main_screen(); }
@@ -355,6 +364,7 @@ static lv_obj_t *settings_button(lv_obj_t *parent, const char *text, int x, int 
 static void open_settings_event(lv_event_t *event)
 {
     lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN);
+    if (s_status_screen) lv_obj_add_flag(s_status_screen, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
     s_calibrating = false;
 }
@@ -373,6 +383,48 @@ static lv_obj_t *ui_text(lv_obj_t *parent, const char *text, uint32_t color, int
     lv_obj_t *label = lv_label_create(parent); lv_label_set_text(label, text);
     lv_obj_set_style_text_color(label, lv_color_hex(color), 0); lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0); lv_obj_set_pos(label, x, y);
     return label;
+}
+
+static void refresh_employee_status_list(void)
+{
+    if (!s_employee_status_list) return;
+    tk_employee_t employees[TK_MAX_EMPLOYEES];
+    uint16_t count;
+    tk_state_t *state = tk_state_lock();
+    count = state->employee_count > TK_MAX_EMPLOYEES ? TK_MAX_EMPLOYEES : state->employee_count;
+    memcpy(employees, state->employees, count * sizeof(tk_employee_t));
+    tk_state_unlock();
+    lv_obj_clean(s_employee_status_list);
+    if (!count) {
+        ui_text(s_employee_status_list, "No employee data yet.\nSync the terminal, then try again.", 0xA9B6A9, 12, 16);
+        return;
+    }
+    for (uint16_t i = 0; i < count; ++i) {
+        int y = i * 38;
+        lv_obj_t *row = ui_card(s_employee_status_list, 0, y, 194, 33, 0x26352C, 0x405249);
+        lv_obj_t *dot = lv_obj_create(row); lv_obj_remove_style_all(dot); lv_obj_set_size(dot, 11, 11); lv_obj_set_pos(dot, 11, 11);
+        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(dot, lv_color_hex(employees[i].clocked_in ? 0x72D572 : 0x6F7C73), 0); lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+        lv_obj_t *name = ui_text(row, employees[i].name, 0xF4F7F2, 30, 8); lv_obj_set_width(name, 101); lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
+        lv_obj_t *state_label = ui_text(row, employees[i].clocked_in ? "IN" : "OUT", employees[i].clocked_in ? 0x9FE4A7 : 0xB5C0B6, 0, 8);
+        lv_obj_set_width(state_label, 47); lv_obj_set_style_text_align(state_label, LV_TEXT_ALIGN_RIGHT, 0); lv_obj_set_pos(state_label, 138, 8);
+    }
+}
+
+static void status_back_event(lv_event_t *event) { (void)event; show_main_screen(); }
+
+static void build_status_ui(void)
+{
+    s_status_screen = lv_obj_create(lv_screen_active());
+    lv_obj_remove_style_all(s_status_screen); lv_obj_set_size(s_status_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_status_screen, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_status_screen, LV_OPA_COVER, 0); lv_obj_add_flag(s_status_screen, LV_OBJ_FLAG_HIDDEN);
+    ui_text(s_status_screen, "TEAM STATUS", 0xD8FF62, 14, 17);
+    ui_text(s_status_screen, "Who is in the office", 0xA9B6A9, 14, 39);
+    s_employee_status_list = lv_obj_create(s_status_screen); lv_obj_remove_style_all(s_employee_status_list); lv_obj_set_size(s_employee_status_list, 194, 184); lv_obj_set_pos(s_employee_status_list, 23, 72);
+    lv_obj_set_scroll_dir(s_employee_status_list, LV_DIR_VER); lv_obj_set_scrollbar_mode(s_employee_status_list, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_set_style_pad_all(s_employee_status_list, 0, 0); lv_obj_set_style_pad_row(s_employee_status_list, 5, 0);
+    lv_obj_t *hint = ui_text(s_status_screen, "Swipe left to return", 0x93A39A, 0, 0); lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -54);
+    lv_obj_t *back = lv_button_create(s_status_screen); lv_obj_set_size(back, 212, 34); lv_obj_set_pos(back, 14, 276); lv_obj_set_style_bg_color(back, lv_color_hex(0x26352C), 0); lv_obj_set_style_bg_color(back, lv_color_hex(0x405249), LV_STATE_PRESSED); lv_obj_set_style_radius(back, 10, 0); lv_obj_set_style_border_width(back, 1, 0); lv_obj_set_style_border_color(back, lv_color_hex(0x405249), 0); lv_obj_add_event_cb(back, status_back_event, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *back_text = ui_text(back, "BACK TO KEYPAD", 0xF4F7F2, 0, 0); lv_obj_center(back_text);
+    refresh_employee_status_list();
 }
 
 static void build_clock_ui(void)
@@ -542,7 +594,7 @@ esp_err_t tk_display_init(void)
     lv_indev_t *indev = lv_indev_create(); lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); lv_indev_set_display(indev, s_display); lv_indev_set_user_data(indev, touch); lv_indev_set_read_cb(indev, touch_cb);
     const esp_timer_create_args_t tick_args = { .callback = tick_cb, .name = "lvgl_tick" };
     esp_timer_handle_t timer; ESP_ERROR_CHECK(esp_timer_create(&tick_args, &timer)); ESP_ERROR_CHECK(esp_timer_start_periodic(timer, 2000));
-    build_clock_ui(); build_setup_ui(); build_settings_ui(); build_calibration_ui(); build_boot_ui(); build_ota_ui(); tk_display_refresh();
+    build_clock_ui(); build_status_ui(); build_setup_ui(); build_settings_ui(); build_calibration_ui(); build_boot_ui(); build_ota_ui(); tk_display_refresh();
     char current_ip[16]; tk_network_ip(current_ip, sizeof(current_ip)); tk_display_set_ip(current_ip);
     if (s_server_label) lv_label_set_text_fmt(s_server_label, "Server: %s", tk_config_get()->server_url[0] ? tk_config_get()->server_url : "not configured");
     xTaskCreate(lvgl_task, "lvgl", 6144, NULL, 5, NULL);
@@ -605,7 +657,7 @@ void tk_display_refresh(void)
     if (!s_count_label) return;
     int employees, pending; tk_state_t *state = tk_state_lock(); employees = state->employee_count; pending = state->event_count; tk_state_unlock();
     char text[64]; snprintf(text, sizeof(text), "%d people - %d pending", employees, pending);
-    _lock_acquire(&s_lvgl_lock); lv_label_set_text(s_count_label, text); _lock_release(&s_lvgl_lock);
+    _lock_acquire(&s_lvgl_lock); lv_label_set_text(s_count_label, text); refresh_employee_status_list(); _lock_release(&s_lvgl_lock);
 }
 
 void tk_display_show_setup(void)
@@ -623,7 +675,7 @@ void tk_display_show_startup(void)
 {
     if (!s_boot_screen) return;
     _lock_acquire(&s_lvgl_lock); s_starting = true;
-    lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_boot_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_status_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_boot_screen, LV_OBJ_FLAG_HIDDEN);
     _lock_release(&s_lvgl_lock);
 }
 
@@ -631,7 +683,7 @@ void tk_display_show_ota(const char *version)
 {
     if (!s_ota_screen) return;
     _lock_acquire(&s_lvgl_lock); s_ota_visible = true; s_starting = false;
-    lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_boot_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_ota_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_status_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_boot_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_ota_screen, LV_OBJ_FLAG_HIDDEN);
     if (version && version[0]) { char text[48]; snprintf(text, sizeof(text), "Preparing %s", version); lv_label_set_text(s_ota_label, text); }
     _lock_release(&s_lvgl_lock);
 }

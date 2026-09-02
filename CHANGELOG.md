@@ -3,6 +3,10 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.22] - 2026-09-02
+
+- Add a swipe-right employee status page to the terminal, with cached IN/OUT state, large coloured presence dots, scrolling, and a swipe-left return gesture.
+
 ## [0.2.21] - 2026-09-02
 
 - Store pending code submissions in a separate compact NVS record instead of expanding the cached employee state.
