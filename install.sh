@@ -2,6 +2,10 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# Pin the bootstrap payload so a stale CDN response for the moving `main`
+# branch cannot reinstall an older runtime. Bump this with each published
+# installer revision; callers may override it for a private fork.
+SOURCE_REF=${TIMETONE_SOURCE_REF:-fa9283d}
 
 stop_before_update() {
   UPDATE_MODE=$(sed -n 's/^TIMETONE_INSTALL_MODE=//p' "$SCRIPT_DIR/web/.env" | head -n 1)
@@ -33,7 +37,7 @@ if [ -f "$SCRIPT_DIR/web/.env" ] && [ "${TIMETONE_UPDATE_IN_PROGRESS:-}" != 1 ];
       TMP_UPDATE=$(mktemp -d)
       trap 'rm -rf "$TMP_UPDATE"' EXIT HUP INT TERM
       printf '%s\n' "Existing TimeTone installation detected — downloading the latest version…" >&2
-      curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/refs/heads/main?cachebust=$(date +%s%N)" -o "$TMP_UPDATE/timetone.tar.gz"
+      curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/$SOURCE_REF?cachebust=$(date +%s%N)" -o "$TMP_UPDATE/timetone.tar.gz"
       mkdir -p "$TMP_UPDATE/source"
       tar -xzf "$TMP_UPDATE/timetone.tar.gz" -C "$TMP_UPDATE/source"
       NEW_SOURCE=$(find "$TMP_UPDATE/source" -mindepth 1 -maxdepth 1 -type d | head -n 1)
@@ -78,7 +82,7 @@ if [ ! -f "$SCRIPT_DIR/web/package.json" ]; then
         tar -xzf "$TMP_DIR/timetone-web.tar.gz" -C "$INSTALL_DIR"
       else
         printf '%s\n' "Prebuilt release unavailable; downloading the source fallback…"
-        curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/refs/heads/main?cachebust=$(date +%s)" -o "$TMP_DIR/timetone.tar.gz"
+        curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/$SOURCE_REF?cachebust=$(date +%s)" -o "$TMP_DIR/timetone.tar.gz"
         mkdir -p "$TMP_DIR/source"
         tar -xzf "$TMP_DIR/timetone.tar.gz" -C "$TMP_DIR/source"
         SOURCE_DIR=$(find "$TMP_DIR/source" -mindepth 1 -maxdepth 1 -type d | head -n 1)
@@ -86,7 +90,7 @@ if [ ! -f "$SCRIPT_DIR/web/package.json" ]; then
       fi
     else
       printf '%s\n' "Downloading the latest TimeTone source release…"
-      curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/refs/heads/main?cachebust=$(date +%s)" -o "$TMP_DIR/timetone.tar.gz"
+      curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/$SOURCE_REF?cachebust=$(date +%s)" -o "$TMP_DIR/timetone.tar.gz"
       mkdir -p "$TMP_DIR/source"
       tar -xzf "$TMP_DIR/timetone.tar.gz" -C "$TMP_DIR/source"
       SOURCE_DIR=$(find "$TMP_DIR/source" -mindepth 1 -maxdepth 1 -type d | head -n 1)
@@ -230,7 +234,7 @@ show_status() {
   APP_VERSION=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$WEB_DIR/package.json" | head -n 1)
   [ -n "$APP_VERSION" ] || APP_VERSION=$(sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$/\1/p' "$ROOT_DIR/VERSION" | head -n 1)
   [ -n "$APP_VERSION" ] || APP_VERSION="unknown"
-  RUNTIME_VERSION=$(printf '%s' "$HEALTH_BODY" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+  RUNTIME_VERSION=$(printf '%s' "$HEALTH_BODY" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
   [ -n "$RUNTIME_VERSION" ] || RUNTIME_VERSION="unknown"
   if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then BUNDLE_STATUS="prebuilt production bundle"; else BUNDLE_STATUS="locally built production bundle"; fi
   if [ "$MODE" = native ]; then
