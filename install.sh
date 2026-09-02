@@ -349,6 +349,23 @@ if [ "$RESET_PASSWORD" = true ]; then
   umask 077
   awk -v password="$NEW_PASSWORD" 'BEGIN { updated=0 } /^ADMIN_PASSWORD=/ { print "ADMIN_PASSWORD=" password; updated=1; next } { print } END { if (!updated) print "ADMIN_PASSWORD=" password }' "$WEB_DIR/.env" > "$RESET_ENV"
   mv "$RESET_ENV" "$WEB_DIR/.env"
+  DB_PATH=$(sed -n 's/^DATABASE_PATH=//p' "$WEB_DIR/.env" | head -n 1)
+  [ -n "$DB_PATH" ] || DB_PATH="$WEB_DIR/data/timekeep.db"
+  SQLITE_MODULE=$(find "$WEB_DIR/.next/standalone/node_modules/.deno" "$WEB_DIR/node_modules/.deno" -type d -path '*/better-sqlite3' 2>/dev/null | head -n 1)
+  if [ -n "$SQLITE_MODULE" ] && [ -f "$DB_PATH" ]; then
+    node - "$DB_PATH" "$NEW_PASSWORD" "$SQLITE_MODULE" <<'NODE'
+const crypto = require("node:crypto");
+const [dbPath, password, modulePath] = process.argv.slice(2);
+const Database = require(modulePath);
+const digest = crypto.createHash("sha256").update(password).digest("hex");
+const db = new Database(dbPath);
+db.prepare("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)").run();
+db.prepare("INSERT INTO settings (key, value) VALUES ('admin_password_digest', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(digest);
+db.close();
+NODE
+  else
+    printf '%s\n' "Warning: database password digest could not be updated; the server will use ADMIN_PASSWORD from .env." >&2
+  fi
   MODE=$(sed -n 's/^TIMETONE_INSTALL_MODE=//p' "$WEB_DIR/.env" | head -n 1)
   [ "$MODE" = native ] || MODE=docker
   printf '%s▸%s Restarting TimeTone with the new password…\n' "$C_GREEN" "$C_RESET" >&2
