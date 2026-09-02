@@ -352,8 +352,10 @@ if [ "$RESET_PASSWORD" = true ]; then
   DB_PATH=$(sed -n 's/^DATABASE_PATH=//p' "$WEB_DIR/.env" | head -n 1)
   [ -n "$DB_PATH" ] || DB_PATH="$WEB_DIR/data/timekeep.db"
   SQLITE_MODULE=$(find "$WEB_DIR/.next/standalone/node_modules/.deno" "$WEB_DIR/node_modules/.deno" -type d -path '*/better-sqlite3' 2>/dev/null | head -n 1)
-  if [ -n "$SQLITE_MODULE" ] && [ -f "$DB_PATH" ]; then
-    node - "$DB_PATH" "$NEW_PASSWORD" "$SQLITE_MODULE" <<'NODE'
+  if [ -n "$SQLITE_MODULE" ]; then
+    for RESET_DB in "$DB_PATH" "$WEB_DIR/data/timekeep.db" "$WEB_DIR/.next/standalone/data/timekeep.db"; do
+      [ -f "$RESET_DB" ] || continue
+      node - "$RESET_DB" "$NEW_PASSWORD" "$SQLITE_MODULE" <<'NODE'
 const crypto = require("node:crypto");
 const [dbPath, password, modulePath] = process.argv.slice(2);
 const Database = require(modulePath);
@@ -363,6 +365,7 @@ db.prepare("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEX
 db.prepare("INSERT INTO settings (key, value) VALUES ('admin_password_digest', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(digest);
 db.close();
 NODE
+    done
   else
     printf '%s\n' "Warning: database password digest could not be updated; the server will use ADMIN_PASSWORD from .env." >&2
   fi
@@ -373,7 +376,7 @@ NODE
     (cd "$WEB_DIR" && docker compose up -d)
   else
     stop_native_server
-    if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid); fi
+    if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && set -a && . "$WEB_DIR/.env" && set +a && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && set -a && . .env && set +a && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid); fi
   fi
   show_status || true
   printf '%s\n' "Password reset complete. Configuration and database preserved." >&2
@@ -391,7 +394,7 @@ if [ "$UPDATE" = true ]; then
       (cd "$WEB_DIR" && npm install --no-audit --no-fund && npm run build)
     fi
     stop_native_server
-    if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid); fi
+    if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && set -a && . "$WEB_DIR/.env" && set +a && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && set -a && . .env && set +a && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid); fi
   fi
   show_status || true
   printf '%s\n' "Configuration and database preserved." >&2
@@ -406,7 +409,7 @@ if [ -f "$WEB_DIR/.env" ] && [ "$FORCE" = false ] && [ "$NON_INTERACTIVE" = fals
     if [ "$MODE" = docker ]; then (cd "$WEB_DIR" && docker compose up -d --build)
     else
       stop_native_server
-      if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && npm run build >/dev/null && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); fi
+      if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && set -a && . "$WEB_DIR/.env" && set +a && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && npm run build >/dev/null && set -a && . .env && set +a && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); fi
     fi
     show_status || true
     exit 0 ;;
@@ -450,7 +453,7 @@ else
     (cd "$WEB_DIR" && npm install && npm run build)
   fi
   stop_native_server
-  if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid); fi
+  if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then (cd "$WEB_DIR/.next/standalone" && set -a && . "$WEB_DIR/.env" && set +a && PORT="$PORT" nohup node server.js > "$WEB_DIR/timetone.log" 2>&1 & echo $! > "$WEB_DIR/timetone.pid"); else (cd "$WEB_DIR" && set -a && . .env && set +a && PORT="$PORT" nohup npm run start -- --hostname 0.0.0.0 > timetone.log 2>&1 & echo $! > timetone.pid); fi
 fi
 show_status || true
 [ "$MODE" = native ] && printf '%s\n' "Native logs: $WEB_DIR/timetone.log  |  PID file: $WEB_DIR/timetone.pid"
