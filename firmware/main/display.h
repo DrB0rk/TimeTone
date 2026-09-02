@@ -10,6 +10,7 @@ typedef enum {
     TK_DISPLAY_ONLINE,
 } tk_display_network_state_t;
 void tk_display_set_network_state(tk_display_network_state_t state);
+void tk_display_set_ip(const char *ip);
 void tk_display_set_online(bool online);
 void tk_display_refresh(void);
 void tk_display_show_setup(void);

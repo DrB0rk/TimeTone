@@ -26,22 +26,33 @@ static char s_ip[16] = "0.0.0.0";
 static bool s_ap_started;
 static httpd_handle_t s_server;
 
-static const char SETUP_HTML[] =
+static const char SETUP_HTML_HEAD[] =
 "<!doctype html><html><head><meta name=viewport content='width=device-width,initial-scale=1'>"
 "<title>TimeTone setup</title><style>body{margin:0;background:#17211b;color:#17211b;font:16px system-ui}"
 "main{max-width:460px;margin:7vh auto;background:#f5f6f2;padding:32px;border-radius:24px}h1{margin:0 0 8px;font-size:30px}"
 "p{color:#657068;line-height:1.5}label{display:block;margin:18px 0 6px;font-size:13px;font-weight:650}input{box-sizing:border-box;width:100%;padding:13px;border:1px solid #d4d8d1;border-radius:10px;font-size:16px}"
-"button{width:100%;margin-top:24px;padding:14px;border:0;border-radius:11px;background:#d8ff62;color:#17211b;font-weight:750;font-size:16px}</style></head>"
-"<body><main><div style='font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#657068'>Terminal setup</div><h1>TimeTone</h1>"
-"<p>Connect this terminal to Wi-Fi and enter the Timekeep server URL. The server will show this terminal for approval automatically.</p><form method=post action=/save>"
-"<label>Wi-Fi name</label><input name=ssid maxlength=32 required><label>Wi-Fi password</label><input name=password type=password maxlength=64>"
-"<label>Server URL</label><input name=server placeholder='http://192.168.1.20:3000' required>"
-"<button>Save and restart</button></form></main></body></html>";
+"button{width:100%;margin-top:24px;padding:14px;border:0;border-radius:11px;background:#d8ff62;color:#17211b;font-weight:750;font-size:16px}fieldset{border:0;padding:0;margin:0}legend{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#657068;margin-top:26px;font-weight:750}small{color:#657068}select{box-sizing:border-box;width:100%;padding:13px;border:1px solid #d4d8d1;border-radius:10px;font-size:16px;background:white}</style></head>";
+
+static void html_escape(char *output, size_t size, const char *input)
+{
+    size_t j = 0;
+    for (size_t i = 0; input && input[i] && j + 1 < size; ++i) {
+        const char *replacement = input[i] == '&' ? "&amp;" : input[i] == '"' ? "&quot;" : input[i] == '<' ? "&lt;" : input[i] == '>' ? "&gt;" : NULL;
+        if (replacement) { size_t n = strlen(replacement); if (j + n >= size) break; memcpy(output + j, replacement, n); j += n; }
+        else output[j++] = input[i];
+    }
+    output[j] = 0;
+}
 
 static esp_err_t root_handler(httpd_req_t *request)
 {
     httpd_resp_set_type(request, "text/html");
-    return httpd_resp_send(request, SETUP_HTML, HTTPD_RESP_USE_STRLEN);
+    const tk_config_t *config = tk_config_get();
+    char ssid[96], server[320], timezone[140], ip[16];
+    html_escape(ssid, sizeof(ssid), config->ssid); html_escape(server, sizeof(server), config->server_url); html_escape(timezone, sizeof(timezone), config->timezone); tk_network_ip(ip, sizeof(ip));
+    char *html = calloc(1, 9000); if (!html) return ESP_ERR_NO_MEM;
+    snprintf(html, 9000, "%s<body><main><div style='font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#657068'>Terminal configuration</div><h1>TimeTone</h1><p>Configure this terminal from the local network. Current address: <b>%s</b></p><form method=post action=/save><fieldset><legend>Connection</legend><label>Wi-Fi name</label><input name=ssid maxlength=32 value=\"%s\" required><label>Wi-Fi password</label><input name=password type=password maxlength=64 placeholder=\"Leave blank to keep current\"><label>Server URL</label><input name=server maxlength=159 value=\"%s\" placeholder=\"http://192.168.1.20:3000\" required></fieldset><fieldset><legend>Terminal behavior</legend><label>Timezone</label><input name=timezone maxlength=63 value=\"%s\"><label>Sync interval (seconds)</label><input name=sync type=number min=2 max=60 value=\"%u\"><label>Screen off after (seconds, 0 disables)</label><input name=screenoff type=number min=0 max=3600 value=\"%u\"><label>Low power after (seconds, 0 disables)</label><input name=lowpower type=number min=0 max=3600 value=\"%u\"><label>Theme</label><select name=theme><option value=\"dark\" %s>Dark</option><option value=\"light\" %s>Light</option></select></fieldset><button>Save and restart terminal</button></form><p><small>Saving restarts the terminal so Wi-Fi changes take effect. The setup access point remains available as a recovery path.</small></p></main></body></html>", SETUP_HTML_HEAD, ip, ssid, server, timezone, config->sync_interval_seconds ?: 5, config->screen_off_timeout_seconds, config->low_power_timeout_seconds, strcmp(config->terminal_theme, "dark") == 0 ? "selected" : "", strcmp(config->terminal_theme, "light") == 0 ? "selected" : "");
+    esp_err_t err = httpd_resp_send(request, html, HTTPD_RESP_USE_STRLEN); free(html); return err;
 }
 
 static void url_decode(char *output, const char *input, size_t output_size)
@@ -80,10 +91,17 @@ static esp_err_t save_handler(httpd_req_t *request)
     if (!body) return ESP_ERR_NO_MEM;
     int received = httpd_req_recv(request, body, request->content_len);
     if (received <= 0) { free(body); return ESP_FAIL; }
-    tk_config_t config = { .configured = true };
+    tk_config_t config = *tk_config_get(); config.configured = true;
     form_value(body, "ssid", config.ssid, sizeof(config.ssid));
-    form_value(body, "password", config.wifi_password, sizeof(config.wifi_password));
+    char password[65]; form_value(body, "password", password, sizeof(password)); if (password[0]) strlcpy(config.wifi_password, password, sizeof(config.wifi_password));
     form_value(body, "server", config.server_url, sizeof(config.server_url));
+    char value[96];
+    form_value(body, "timezone", value, sizeof(value)); if (value[0]) strlcpy(config.timezone, value, sizeof(config.timezone));
+    form_value(body, "theme", value, sizeof(value)); if (strcmp(value, "dark") == 0 || strcmp(value, "light") == 0) { strlcpy(config.terminal_theme, value, sizeof(config.terminal_theme)); config.terminal_theme_override = true; }
+    form_value(body, "sync", value, sizeof(value)); int number = atoi(value); if (number >= 2 && number <= 60) config.sync_interval_seconds = number;
+    form_value(body, "screenoff", value, sizeof(value)); number = atoi(value); if (number >= 0 && number <= 3600) config.screen_off_timeout_seconds = number;
+    form_value(body, "lowpower", value, sizeof(value)); number = atoi(value); if (number >= 0 && number <= 3600) config.low_power_timeout_seconds = number;
+    config.power_timeouts_configured = true;
     // Generate the device credential locally; it is never typed or exposed
     // during setup. The server receives it through the pairing handshake.
     if (tk_config_get()->device_token[0]) {
@@ -92,7 +110,6 @@ static esp_err_t save_handler(httpd_req_t *request)
         uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA);
         snprintf(config.device_token, sizeof(config.device_token), "tk-%02X%02X%02X%02X-%08lX", mac[2], mac[3], mac[4], mac[5], (unsigned long)esp_random());
     }
-    strlcpy(config.timezone, "Europe/Amsterdam", sizeof(config.timezone));
     free(body);
     if (!config.ssid[0] || !config.server_url[0]) return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, "Missing required value");
     while (strlen(config.server_url) && config.server_url[strlen(config.server_url) - 1] == '/') config.server_url[strlen(config.server_url) - 1] = 0;
@@ -135,6 +152,7 @@ static void event_handler(void *arg, esp_event_base_t base, int32_t id, void *da
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = data;
         snprintf(s_ip, sizeof(s_ip), IPSTR, IP2STR(&event->ip_info.ip));
+        tk_display_set_ip(s_ip);
         xEventGroupSetBits(s_events, CONNECTED_BIT);
         tk_display_set_network_state(TK_DISPLAY_CONNECTING);
         start_sntp_once();
@@ -181,6 +199,9 @@ esp_err_t tk_network_init(void)
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &station));
     } else ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_RETURN_ON_ERROR(esp_wifi_start(), TAG, "wifi start");
+    // Keep the configuration portal available through the station IP as well
+    // as the fallback setup access point.
+    start_http_server();
     if (!stored->configured) tk_network_start_setup_ap();
     return ESP_OK;
 }

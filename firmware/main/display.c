@@ -45,7 +45,7 @@ static const char *TAG = "display";
 static _lock_t s_lvgl_lock;
 static lv_display_t *s_display;
 static lv_obj_t *s_main_screen, *s_setup_screen, *s_settings_screen, *s_calibration_screen, *s_header;
-static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_count_label, *s_brand_label;
+static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_count_label, *s_brand_label, *s_ip_label;
 static lv_obj_t *s_sync_indicator;
 static lv_obj_t *s_setup_details;
 static char s_pin[9];
@@ -324,7 +324,7 @@ static void build_clock_ui(void)
     s_brand_label = lv_label_create(s_header); lv_label_set_text(s_brand_label, "TIMETONE"); lv_label_set_long_mode(s_brand_label, LV_LABEL_LONG_DOT); lv_obj_set_width(s_brand_label, 112); lv_obj_set_style_text_color(s_brand_label, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_brand_label, &lv_font_montserrat_14, 0); lv_obj_align(s_brand_label, LV_ALIGN_LEFT_MID, 14, 0);
     s_clock_label = lv_label_create(s_header); lv_obj_set_style_text_color(s_clock_label, lv_color_white(), 0); lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0); lv_obj_align(s_clock_label, LV_ALIGN_RIGHT_MID, -14, 0);
     s_sync_indicator = lv_label_create(s_header); lv_obj_set_style_text_color(s_sync_indicator, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_sync_indicator, &lv_font_montserrat_14, 0); lv_obj_align(s_sync_indicator, LV_ALIGN_RIGHT_MID, -106, 0); lv_label_set_text(s_sync_indicator, "○");
-    lv_obj_t *settings = lv_button_create(s_header); lv_obj_set_size(settings, 34, 28); lv_obj_align(settings, LV_ALIGN_RIGHT_MID, -66, 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x34443A), 0); lv_obj_set_style_radius(settings, 8, 0); lv_obj_set_style_border_width(settings, 0, 0); lv_obj_add_event_cb(settings, open_settings_event, LV_EVENT_CLICKED, NULL); lv_obj_t *settings_label = lv_label_create(settings); lv_label_set_text(settings_label, "SET"); lv_obj_set_style_text_font(settings_label, &lv_font_montserrat_14, 0); lv_obj_center(settings_label);
+    lv_obj_t *settings = lv_button_create(s_header); lv_obj_set_size(settings, 34, 28); lv_obj_align(settings, LV_ALIGN_RIGHT_MID, -66, 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x34443A), 0); lv_obj_set_style_radius(settings, 8, 0); lv_obj_set_style_border_width(settings, 0, 0); lv_obj_add_event_cb(settings, open_settings_event, LV_EVENT_CLICKED, NULL); lv_obj_t *settings_label = lv_label_create(settings); lv_label_set_text(settings_label, LV_SYMBOL_SETTINGS); lv_obj_set_style_text_font(settings_label, &lv_font_montserrat_14, 0); lv_obj_center(settings_label);
     lv_obj_t *prompt = lv_label_create(s_main_screen); lv_label_set_text(prompt, "Clock in or out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(fg_color()), 0); lv_obj_set_pos(prompt, 14, 55);
     s_pin_label = lv_label_create(s_main_screen); lv_obj_set_size(s_pin_label, 212, 38); lv_obj_set_style_bg_color(s_pin_label, lv_color_white(), 0); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_COVER, 0); lv_obj_set_style_border_width(s_pin_label, 1, 0); lv_obj_set_style_border_color(s_pin_label, lv_color_hex(0xD4D8D1), 0); lv_obj_set_style_radius(s_pin_label, 10, 0); lv_obj_set_style_pad_left(s_pin_label, 12, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 14, 78);
     s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 30); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_WRAP); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 120);
@@ -370,9 +370,10 @@ static void build_settings_ui(void)
     lv_obj_remove_style_all(s_settings_screen); lv_obj_set_size(s_settings_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_settings_screen, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_settings_screen, LV_OPA_COVER, 0); lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
     lv_obj_t *title = lv_label_create(s_settings_screen); lv_label_set_text(title, "TERMINAL SETTINGS"); lv_obj_set_style_text_color(title, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0); lv_obj_set_pos(title, 18, 18);
     lv_obj_t *subtitle = lv_label_create(s_settings_screen); lv_label_set_text(subtitle, "Display and touch controls"); lv_obj_set_style_text_color(subtitle, lv_color_hex(0xC8D0C9), 0); lv_obj_set_style_text_font(subtitle, &lv_font_montserrat_14, 0); lv_obj_set_pos(subtitle, 18, 44);
-    settings_button(s_settings_screen, "TOGGLE LIGHT / DARK", 82, settings_theme_event);
-    settings_button(s_settings_screen, "CALIBRATE TOUCH", 132, settings_calibrate_event);
-    lv_obj_t *hint_card = lv_obj_create(s_settings_screen); lv_obj_remove_style_all(hint_card); lv_obj_set_size(hint_card, 204, 72); lv_obj_set_pos(hint_card, 18, 188); lv_obj_set_style_bg_color(hint_card, lv_color_hex(0x26352C), 0); lv_obj_set_style_radius(hint_card, 12, 0);
+    s_ip_label = lv_label_create(s_settings_screen); lv_obj_set_style_text_color(s_ip_label, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_ip_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_ip_label, 18, 68); lv_label_set_text(s_ip_label, "IP: 0.0.0.0");
+    settings_button(s_settings_screen, "TOGGLE LIGHT / DARK", 94, settings_theme_event);
+    settings_button(s_settings_screen, "CALIBRATE TOUCH", 144, settings_calibrate_event);
+    lv_obj_t *hint_card = lv_obj_create(s_settings_screen); lv_obj_remove_style_all(hint_card); lv_obj_set_size(hint_card, 204, 60); lv_obj_set_pos(hint_card, 18, 198); lv_obj_set_style_bg_color(hint_card, lv_color_hex(0x26352C), 0); lv_obj_set_style_radius(hint_card, 12, 0);
     s_calibration_hint = lv_label_create(hint_card); lv_label_set_text(s_calibration_hint, "Calibration uses 4 corner taps\nfor accurate input."); lv_obj_set_style_text_font(s_calibration_hint, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(s_calibration_hint, lv_color_white(), 0); lv_obj_set_pos(s_calibration_hint, 12, 12);
     settings_button(s_settings_screen, "BACK", 274, settings_back_event);
 }
@@ -462,6 +463,13 @@ void tk_display_set_network_state(tk_display_network_state_t state)
 void tk_display_set_online(bool online)
 {
     tk_display_set_network_state(online ? TK_DISPLAY_ONLINE : TK_DISPLAY_OFFLINE);
+}
+
+void tk_display_set_ip(const char *ip)
+{
+    if (!s_ip_label || !ip) return;
+    char text[32]; snprintf(text, sizeof(text), "IP: %s", ip);
+    _lock_acquire(&s_lvgl_lock); lv_label_set_text(s_ip_label, text); _lock_release(&s_lvgl_lock);
 }
 
 void tk_display_refresh(void)
