@@ -43,6 +43,21 @@ flowchart LR
 | Operations | Device approval, configurable terminal settings, USB Web Serial firmware updates, GitHub release updater |
 | Data | CSV exports, audit trail, complete workspace migration import/export, persistent SQLite storage |
 
+## Screenshots
+
+These screenshots show a fictional Northstar Studio workspace populated with
+demo employees and attendance. They are illustrative; no real employee data is
+included. To recreate a similar local workspace, see [`docs/demo-data.sql`](docs/demo-data.sql).
+
+<p align="center">
+  <img src="docs/screenshots/overview.png" alt="TimeTone overview dashboard" width="49%">
+  <img src="docs/screenshots/reports.png" alt="TimeTone reports dashboard" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/employees.png" alt="TimeTone employees page" width="49%">
+  <img src="docs/screenshots/devices.png" alt="TimeTone devices page" width="49%">
+</p>
+
 ## Install in one command
 
 On Debian or Ubuntu, this interactive installer can install missing host

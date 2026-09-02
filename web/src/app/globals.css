@@ -136,7 +136,7 @@ html.dark .bg-white { background-color: #1b261f !important; }
 html.dark .bg-\[\#f5f6f2\] { background-color: #101712 !important; }
 html.dark .text-\[\#17211b\], html.dark .text-black { color: #edf5ee !important; }
 html.dark .text-black\/80, html.dark .text-black\/75, html.dark .text-black\/70, html.dark .text-black\/65, html.dark .text-black\/60, html.dark .text-black\/55, html.dark .text-black\/50, html.dark .text-black\/45, html.dark .text-black\/40, html.dark .text-black\/35 { color: rgb(237 245 238 / .72) !important; }
-html.dark .border-black\/6, html.dark .border-black\/10, html.dark .divide-black\/5 { border-color: rgb(255 255 255 / .10) !important; }
+html.dark .border-black\/5, html.dark .border-black\/6, html.dark .border-black\/8, html.dark .border-black\/10, html.dark .border-black\/12, html.dark .divide-black\/5 { border-color: rgb(255 255 255 / .10) !important; }
 html.dark input, html.dark select { background-color: #243127 !important; color: #edf5ee !important; border-color: rgb(255 255 255 / .14) !important; }
 html.dark .bg-\[\#eef0eb\], html.dark .bg-\[\#eef4e4\] { background-color: #2b3a2f !important; }
 /* Keep semantic light accents legible in dark mode; these deliberately stay

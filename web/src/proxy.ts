@@ -16,6 +16,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api/device|api/health|_next/static|_next/image|favicon.ico).*)",
+    // Public assets (SVG logo, fonts, styles, and browser bundles) must not be
+    // redirected to /login; only application routes and protected APIs need
+    // session enforcement.
+    "/((?!api/device|api/health|_next/static|_next/image|favicon.ico|.*\\..*).*)",
   ],
 };

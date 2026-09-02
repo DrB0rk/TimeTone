@@ -3,6 +3,13 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.7] - 2026-09-02
+
+- Complete a dashboard UI/UX consistency pass across light and dark themes.
+- Fix public asset routing so the TimeTone logo loads before authentication.
+- Improve overview copy for singular attendance and add a reproducible demo fixture.
+- Add polished README screenshots for the overview, reports, employees, and devices pages.
+
 ## [0.2.6] - 2026-09-02
 
 - Confirm Docker update completion after the old container is replaced.
