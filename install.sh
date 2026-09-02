@@ -3,6 +3,25 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
+stop_before_update() {
+  UPDATE_MODE=$(sed -n 's/^TIMETONE_INSTALL_MODE=//p' "$SCRIPT_DIR/web/.env" | head -n 1)
+  if [ "$UPDATE_MODE" = docker ]; then
+    printf '%s\n' "Stopping the existing Docker service before updating…" >&2
+    (cd "$SCRIPT_DIR/web" && docker compose down)
+    return
+  fi
+  UPDATE_PID=$(sed -n '1p' "$SCRIPT_DIR/web/timetone.pid" 2>/dev/null || true)
+  case "$UPDATE_PID" in *[!0-9]*|'') UPDATE_PID="" ;; esac
+  if [ -n "$UPDATE_PID" ] && kill -0 "$UPDATE_PID" 2>/dev/null; then
+    printf '%s\n' "Stopping the existing native service before updating…" >&2
+    kill "$UPDATE_PID" 2>/dev/null || true
+    stop_attempt=1
+    while [ "$stop_attempt" -le 15 ] && kill -0 "$UPDATE_PID" 2>/dev/null; do sleep 1; stop_attempt=$((stop_attempt + 1)); done
+    if kill -0 "$UPDATE_PID" 2>/dev/null; then kill -9 "$UPDATE_PID" 2>/dev/null || true; fi
+  fi
+  if command -v fuser >/dev/null 2>&1; then fuser -k "$(sed -n 's/^TIMETONE_PORT=//p' "$SCRIPT_DIR/web/.env" | head -n 1)/tcp" >/dev/null 2>&1 || true; fi
+}
+
 # Re-running the same entrypoint against an existing installation is an
 # update, not a fresh install. Fetch the current source first, while keeping
 # the user's .env and persistent data in place.
@@ -13,6 +32,7 @@ if [ -f "$SCRIPT_DIR/web/.env" ] && [ "${TIMETONE_UPDATE_IN_PROGRESS:-}" != 1 ];
       command -v curl >/dev/null 2>&1 || { printf '%s\n' "curl is required to update TimeTone." >&2; exit 1; }
       TMP_UPDATE=$(mktemp -d)
       trap 'rm -rf "$TMP_UPDATE"' EXIT HUP INT TERM
+      stop_before_update
       printf '%s\n' "Existing TimeTone installation detected — downloading the latest version…" >&2
       curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/refs/heads/main?cachebust=$(date +%s%N)" -o "$TMP_UPDATE/timetone.tar.gz"
       mkdir -p "$TMP_UPDATE/source"
@@ -208,6 +228,8 @@ show_status() {
   APP_VERSION=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$WEB_DIR/package.json" | head -n 1)
   [ -n "$APP_VERSION" ] || APP_VERSION=$(sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$/\1/p' "$ROOT_DIR/VERSION" | head -n 1)
   [ -n "$APP_VERSION" ] || APP_VERSION="unknown"
+  RUNTIME_VERSION=$(printf '%s' "$HEALTH_BODY" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+  [ -n "$RUNTIME_VERSION" ] || RUNTIME_VERSION="unknown"
   if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then BUNDLE_STATUS="prebuilt production bundle"; else BUNDLE_STATUS="locally built production bundle"; fi
   if [ "$MODE" = native ]; then
     DATA_PATH=$(sed -n 's/^DATABASE_PATH=//p' "$WEB_DIR/.env" | head -n 1)
@@ -216,18 +238,20 @@ show_status() {
     DATA_PATH="Docker volume: timekeep-data"
   fi
   if [ "$UPDATE" = true ]; then OPERATION="updated"; else OPERATION="installed"; fi
-  if [ "$HEALTH_OK" = true ]; then
+  if [ "$HEALTH_OK" = true ] && [ "$RUNTIME_VERSION" = "$APP_VERSION" ]; then
     printf '\n%s%s✓ TimeTone %s successfully%s\n' "$C_BOLD" "$C_GREEN" "$OPERATION" "$C_RESET"
     printf '  Version: %s%s%s\n' "$C_CYAN" "$APP_VERSION" "$C_RESET"
     printf '  Mode: %s%s%s\n' "$C_CYAN" "$MODE" "$C_RESET"
     printf '  Web runtime: %s%s%s\n' "$C_CYAN" "$BUNDLE_STATUS" "$C_RESET"
     printf '  LAN URL: %shttp://%s:%s%s\n' "$C_CYAN" "${HOST_IP:-localhost}" "$PORT" "$C_RESET"
     printf '  Local health: %shealthy%s (%s)\n' "$C_GREEN" "$C_RESET" "$HEALTH_URL"
+    printf '  Running version: %s%s%s\n' "$C_CYAN" "$RUNTIME_VERSION" "$C_RESET"
     printf '  Persistent data: %s%s%s\n' "$C_DIM" "$DATA_PATH" "$C_RESET"
     printf '  Admin UI: %sopen the LAN URL above and sign in%s\n' "$C_DIM" "$C_RESET"
   else
     printf '\n%s%s✗ Installation needs attention%s\n' "$C_BOLD" "$C_RED" "$C_RESET"
-    printf '  Version detected: %s\n' "$APP_VERSION"
+    printf '  Installed version: %s\n' "$APP_VERSION"
+    printf '  Running version: %s\n' "$RUNTIME_VERSION"
     printf '  URL: http://%s:%s\n' "${HOST_IP:-localhost}" "$PORT"
     printf '  Health endpoint: %s\n' "$HEALTH_URL"
     if [ "$MODE" = native ]; then printf '  Check logs: %s/timetone.log\n' "$WEB_DIR"; else printf '  Check status: cd %s && docker compose ps\n' "$WEB_DIR"; fi
