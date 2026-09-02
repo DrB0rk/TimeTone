@@ -44,18 +44,19 @@ ask() {
 }
 
 [ -n "$MODE" ] || MODE=${TIMETONE_MODE:-}
+DEFAULT_MODE=docker
 if [ -z "$MODE" ]; then
   if [ "$NON_INTERACTIVE" = true ]; then MODE=docker
   else
-    DEFAULT_MODE=docker
     command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1 || DEFAULT_MODE=native
     printf 'Install mode (docker/native) [%s]: ' "$DEFAULT_MODE" >&2
     MODE=""
     if [ -r /dev/tty ]; then IFS= read -r MODE </dev/tty || true; else MODE=""; fi
-    [ -n "$MODE" ] || MODE=$DEFAULT_MODE
+  MODE=$(printf '%s' "$MODE" | tr -d '\r' | tr '[:upper:]' '[:lower:]')
+  [ -n "$MODE" ] || MODE=$DEFAULT_MODE
   fi
 fi
-case "$MODE" in docker|native) ;; *) printf '%s\n' "Choose docker or native as the install mode." >&2; exit 1 ;; esac
+case "$MODE" in docker|native) ;; *) printf '%s\n' "Unrecognized install mode; using $DEFAULT_MODE." >&2; MODE=$DEFAULT_MODE ;; esac
 
 if [ "$MODE" = docker ]; then
   command -v docker >/dev/null 2>&1 || { printf '%s\n' "Docker is not installed. Choose --native or install Docker Engine first." >&2; exit 1; }
