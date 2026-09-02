@@ -3,6 +3,14 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.12] - 2026-09-02
+
+- Overhaul terminal connection recovery, startup authentication, and full-sync scheduling.
+- Keep Wi-Fi reconnection active while the fallback configuration portal is available.
+- Prevent routine health checks and successful clock-ins from triggering disruptive full syncs.
+- Add bounded HTTPS timeouts, HTTP keep-alive, device request identification, and retry throttling.
+- Force dynamic, no-cache device API responses.
+
 ## [0.2.11] - 2026-09-02
 
 - Harden dashboard software updates with install-root discovery and actionable API errors.

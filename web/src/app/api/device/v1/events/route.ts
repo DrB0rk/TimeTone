@@ -3,6 +3,8 @@ import { authenticateDevice, unauthorized } from "@/lib/device-api";
 import { db, ingestDeviceEvent } from "@/lib/db";
 import { publishLiveUpdate } from "@/lib/live-updates";
 
+export const dynamic = "force-dynamic";
+
 const eventSchema = z.object({
   id: z.string().min(8).max(80),
   employeeId: z.string().min(1).max(80),

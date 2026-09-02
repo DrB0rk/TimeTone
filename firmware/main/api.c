@@ -23,6 +23,8 @@ static bool s_ota_in_progress;
 static uint8_t s_sync_failures;
 static uint32_t s_config_elapsed;
 static volatile bool s_force_config;
+static TickType_t s_next_pair_attempt;
+static TickType_t s_next_config_attempt;
 
 typedef struct { char *data; size_t length; size_t capacity; } response_buffer_t;
 static void ota_task(void *argument);
@@ -53,7 +55,12 @@ static int request(const char *path, esp_http_client_method_t method, const char
         // Keep the 5-second health loop from monopolizing the keypad when a
         // server is unreachable; larger config payloads retain a longer
         // timeout for slower networks.
-        .timeout_ms = strstr(path, "/heartbeat") ? 3500 : strstr(path, "/clock") ? 7000 : strstr(path, "/events") ? 7000 : 12000,
+        // HTTPS through a reverse proxy includes DNS, TCP and TLS setup.
+        // A tiny heartbeat timeout caused otherwise healthy terminals to flap
+        // on busy Wi-Fi. These limits stay bounded while allowing a full
+        // connection setup to complete reliably.
+        .timeout_ms = strstr(path, "/heartbeat") ? 8000 : strstr(path, "/clock") ? 10000 : strstr(path, "/events") ? 10000 : 15000,
+        .keep_alive_enable = true,
         .event_handler = http_event,
         .user_data = &buffer,
         .crt_bundle_attach = esp_crt_bundle_attach,
@@ -64,6 +71,8 @@ static int request(const char *path, esp_http_client_method_t method, const char
     snprintf(auth, sizeof(auth), "Bearer %s", config->device_token);
     esp_http_client_set_header(client, "Authorization", auth);
     esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_header(client, "Accept", "application/json");
+    esp_http_client_set_header(client, "User-Agent", "TimeTone-Terminal/" TK_FIRMWARE_VERSION);
     if (body) esp_http_client_set_post_field(client, body, strlen(body));
     esp_err_t err = esp_http_client_perform(client);
     // A 401 response can make esp_http_client return ESP_ERR_NOT_SUPPORTED
@@ -236,7 +245,7 @@ static esp_err_t push_events(void)
     return ESP_OK;
 }
 
-static void heartbeat(void)
+static int heartbeat(void)
 {
     int pending;
     tk_state_t *state = tk_state_lock(); pending = state->event_count; tk_state_unlock();
@@ -251,42 +260,70 @@ static void heartbeat(void)
             if (cJSON_IsTrue(cJSON_GetObjectItem(root, "configRefresh"))) s_force_config = true;
             cJSON_Delete(root);
         }
+        return status;
     }
     if (status == 401) {
+        // Pairing an unapproved device more than once every 30 seconds adds
+        // load without making approval faster. The regular health loop still
+        // notices approval immediately on its next pass.
+        if (xTaskGetTickCount() < s_next_pair_attempt) return status;
+        s_next_pair_attempt = xTaskGetTickCount() + pdMS_TO_TICKS(30000);
         char pair_body[320];
         snprintf(pair_body, sizeof(pair_body), "{\"deviceName\":\"%s\",\"token\":\"%s\",\"firmwareVersion\":\"%s\",\"ipAddress\":\"%s\"}", tk_network_setup_ssid(), tk_config_get()->device_token, TK_FIRMWARE_VERSION, ip);
         int pair_status = request("/api/device/v1/pair", HTTP_METHOD_POST, pair_body, response, sizeof(response));
         if (pair_status == 202) ESP_LOGW(TAG, "device pairing requested; approve it in the server dashboard");
         else if (pair_status == 200) ESP_LOGI(TAG, "device pairing already approved");
     }
+    return status;
 }
 
 static void api_task(void *argument)
 {
-    bool first_sync = false;
+    // Do a config fetch as soon as the first authenticated heartbeat succeeds.
+    // This is deliberately after—not before—the health check so startup stays
+    // responsive when the server is offline or the device is awaiting approval.
+    bool first_sync = true;
     while (true) {
         uint16_t base_seconds = tk_config_get()->sync_interval_seconds ?: s_sync_interval_seconds;
         uint16_t full_sync_seconds = tk_config_get()->full_sync_interval_seconds ?: 300;
-        bool config_due = first_sync || s_force_config || s_config_elapsed >= full_sync_seconds;
+        bool config_due = (first_sync || s_force_config || s_config_elapsed >= full_sync_seconds) &&
+            xTaskGetTickCount() >= s_next_config_attempt;
         if (tk_network_connected() && tk_config_get()->configured && !tk_display_is_sleeping()) {
-            esp_err_t config_result = ESP_OK;
-            if (config_due) {
-                tk_display_set_network_state(TK_DISPLAY_SYNCING);
-                // Employee/config refresh is intentionally less frequent than
-                // event delivery. This avoids repeatedly downloading the same
-                // payload and keeps the keypad responsive.
-                config_result = fetch_config();
-                s_config_elapsed = 0;
-                first_sync = false;
-                s_force_config = false;
-            }
-            push_events();
-            // The short interval is a real health check: keep the terminal's
-            // online status fresh without downloading the full configuration.
-            heartbeat();
-            if (config_due) {
-                if (config_result == ESP_OK) { s_sync_failures = 0; tk_display_set_network_state(TK_DISPLAY_ONLINE); }
-                else { if (s_sync_failures < 5) s_sync_failures++; tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING); }
+            // The short interval is a genuine health check. Do not start a
+            // full download or event upload until authentication is known to
+            // be valid, which avoids long timeouts and misleading status loops.
+            int health_status = heartbeat();
+            if (health_status == 200) {
+                s_sync_failures = 0;
+                if (config_due) {
+                    tk_display_set_network_state(TK_DISPLAY_SYNCING);
+                    esp_err_t config_result = fetch_config();
+                    if (config_result == ESP_OK) {
+                        s_config_elapsed = 0;
+                        first_sync = false;
+                        s_force_config = false;
+                        s_next_config_attempt = 0;
+                    } else {
+                        // Keep the previous working employee cache and retry
+                        // configuration soon, without declaring the server
+                        // offline when its health endpoint remains reachable.
+                        // Throttle a broken config route to one attempt per
+                        // 30 seconds; the separate heartbeat remains fast.
+                        s_next_config_attempt = xTaskGetTickCount() + pdMS_TO_TICKS(30000);
+                        s_force_config = false;
+                        s_config_elapsed = full_sync_seconds;
+                        ESP_LOGW(TAG, "configuration sync failed; retaining local cache and retrying in 30s");
+                    }
+                }
+                if (push_events() != ESP_OK) ESP_LOGW(TAG, "queued event upload failed; will retry");
+                tk_display_set_network_state(TK_DISPLAY_ONLINE);
+            } else if (health_status == 401) {
+                // A device awaiting dashboard approval is not a Wi-Fi failure.
+                // Keep it discoverable and retry at a calm fixed cadence.
+                tk_display_set_network_state(TK_DISPLAY_CONNECTING);
+            } else {
+                if (s_sync_failures < 5) s_sync_failures++;
+                tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING);
             }
         }
         uint16_t seconds = base_seconds;
@@ -294,6 +331,8 @@ static void api_task(void *argument)
             uint16_t multiplier = 1u << (s_sync_failures > 4 ? 4 : s_sync_failures);
             seconds = seconds > (60 / multiplier) ? 60 : seconds * multiplier;
         }
+        // Pending approval should remain responsive without hammering pair.
+        if (tk_network_connected() && tk_config_get()->configured && s_sync_failures == 0 && xTaskGetTickCount() < s_next_pair_attempt) seconds = seconds < 10 ? 10 : seconds;
         uint32_t before = xTaskGetTickCount() / configTICK_RATE_HZ;
         bool woken = xSemaphoreTake(s_wake, pdMS_TO_TICKS(seconds * 1000)) == pdTRUE;
         uint32_t after = xTaskGetTickCount() / configTICK_RATE_HZ;
@@ -309,4 +348,5 @@ esp_err_t tk_api_start(void)
     return xTaskCreate(api_task, "timekeep_api", 8192, NULL, 4, NULL) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }
 
-void tk_api_wake(void) { s_force_config = true; if (s_wake) xSemaphoreGive(s_wake); }
+void tk_api_wake(void) { s_force_config = true; s_next_config_attempt = 0; if (s_wake) xSemaphoreGive(s_wake); }
+void tk_api_poke(void) { if (s_wake) xSemaphoreGive(s_wake); }

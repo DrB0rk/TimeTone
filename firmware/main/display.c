@@ -219,7 +219,9 @@ static void code_submit_task(void *argument)
     else if (err == ESP_OK) {
         char message[96]; snprintf(message, sizeof(message), "%s, %s!", clocked_in ? "Welcome" : "Goodbye", employee_name);
         set_status(message, clocked_in ? 0x168455 : 0x526159);
-        tk_api_wake();
+        // A clock response already proves server health. Wake the health loop
+        // without forcing an expensive employee/config refresh after each tap.
+        tk_api_poke();
     } else set_status("Could not reach server - try again", 0xC47B24);
     _lock_release(&s_lvgl_lock);
     vTaskDelete(NULL);
@@ -509,6 +511,7 @@ esp_err_t tk_display_init(void)
 void tk_display_set_network_state(tk_display_network_state_t state)
 {
     if (!s_status_label || !s_setup_screen) return;
+    bool changed = s_network_state != state;
     s_network_state = state;
     s_online = state == TK_DISPLAY_ONLINE;
     _lock_acquire(&s_lvgl_lock);
@@ -523,10 +526,15 @@ void tk_display_set_network_state(tk_display_network_state_t state)
         if (s_starting && state != TK_DISPLAY_ONLINE && state != TK_DISPLAY_SYNC_RETRYING) { _lock_release(&s_lvgl_lock); return; }
         if (state == TK_DISPLAY_ONLINE || state == TK_DISPLAY_SYNC_RETRYING) { s_starting = false; lv_obj_add_flag(s_boot_screen, LV_OBJ_FLAG_HIDDEN); }
         lv_obj_clear_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);
-        if (state == TK_DISPLAY_CONNECTING) set_status("Connecting to server", 0xC47B24);
-        else if (state == TK_DISPLAY_SYNCING) set_status("Syncing data", 0xC47B24);
-        else if (state == TK_DISPLAY_SYNC_RETRYING) set_status("Sync delayed - retrying", 0xC47B24);
-        else set_status("Online - synced", 0x168455);
+        // Health checks run frequently. Preserve useful interaction feedback
+        // (such as a successful clock-in) while the connection state is
+        // unchanged instead of rewriting it every few seconds.
+        if (changed) {
+            if (state == TK_DISPLAY_CONNECTING) set_status("Connecting to server", 0xC47B24);
+            else if (state == TK_DISPLAY_SYNCING) set_status("Syncing data", 0xC47B24);
+            else if (state == TK_DISPLAY_SYNC_RETRYING) set_status("Sync delayed - retrying", 0xC47B24);
+            else set_status("Online - synced", 0x168455);
+        }
     } else {
         if (s_starting) { _lock_release(&s_lvgl_lock); return; }
         char details[96]; snprintf(details, sizeof(details), "%s\nPassword: timekeep", tk_network_setup_ssid());

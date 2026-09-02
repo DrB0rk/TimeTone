@@ -1,6 +1,8 @@
 import { authenticateDevice, unauthorized } from "@/lib/device-api";
 import { db, getEmployees, getSettings } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export function GET(request: Request) {
   const device = authenticateDevice(request);
   if (!device) return unauthorized();

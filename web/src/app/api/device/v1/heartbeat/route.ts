@@ -2,6 +2,8 @@ import { z } from "zod";
 import { authenticateDevice, unauthorized } from "@/lib/device-api";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 const schema = z.object({
   firmwareVersion: z.string().max(40),
   ipAddress: z.string().max(64).optional(),
@@ -28,5 +30,8 @@ export async function POST(request: Request) {
     parsed.data.firmwareVersion,
     device.id,
   );
-  return Response.json({ ok: true, serverTime: new Date().toISOString(), configRefresh: syncRequested });
+  return Response.json(
+    { ok: true, serverTime: new Date().toISOString(), configRefresh: syncRequested },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } },
+  );
 }

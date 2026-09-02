@@ -170,14 +170,17 @@ static void event_handler(void *arg, esp_event_base_t base, int32_t id, void *da
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) { s_connect_attempts = 0; s_fallback_active = false; tk_display_set_network_state(TK_DISPLAY_CONNECTING); esp_wifi_connect(); }
     else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         xEventGroupClearBits(s_events, CONNECTED_BIT);
-        if (!s_fallback_active && ++s_connect_attempts >= 3) {
+        if (++s_connect_attempts >= 3 && !s_fallback_active) {
             s_fallback_active = true;
             tk_network_start_setup_ap();
             tk_display_show_setup();
-        } else if (!s_fallback_active) {
-            tk_display_set_network_state(TK_DISPLAY_CONNECTING);
-            esp_wifi_connect();
         }
+        // AP fallback is a recovery portal, not a replacement for the station.
+        // Keep attempting STA reconnection while the portal is visible so a
+        // temporary router or internet outage heals on its own.
+        tk_display_set_network_state(TK_DISPLAY_CONNECTING);
+        ESP_LOGW(TAG, "station disconnected (attempt %u); reconnecting", s_connect_attempts);
+        esp_wifi_connect();
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = data;
         snprintf(s_ip, sizeof(s_ip), IPSTR, IP2STR(&event->ip_info.ip));

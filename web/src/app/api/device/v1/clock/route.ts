@@ -9,6 +9,8 @@ import {
 } from "@/lib/db";
 import { publishLiveUpdate } from "@/lib/live-updates";
 
+export const dynamic = "force-dynamic";
+
 const schema = z.object({ code: z.string().regex(/^[ABCD]{4}$/) });
 
 export async function POST(request: Request) {
