@@ -16,12 +16,15 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid payload" }, { status: 400 });
   }
   db.prepare(
-    "UPDATE devices SET last_seen_at = ?, firmware_version = ?, ip_address = ?, pending_events = ? WHERE id = ?",
+    "UPDATE devices SET last_seen_at = ?, firmware_version = ?, ip_address = ?, pending_events = ?, ota_version = CASE WHEN ota_version = ? THEN NULL ELSE ota_version END, ota_url = CASE WHEN ota_version = ? THEN NULL ELSE ota_url END, ota_requested_at = CASE WHEN ota_version = ? THEN NULL ELSE ota_requested_at END WHERE id = ?",
   ).run(
     new Date().toISOString(),
     parsed.data.firmwareVersion,
     parsed.data.ipAddress || null,
     parsed.data.pendingEvents,
+    parsed.data.firmwareVersion,
+    parsed.data.firmwareVersion,
+    parsed.data.firmwareVersion,
     device.id,
   );
   return Response.json({ ok: true, serverTime: new Date().toISOString() });

@@ -122,6 +122,20 @@ export async function saveDeviceSettings(formData: FormData) {
   revalidatePath("/devices");
 }
 
+export async function requestFirmwareUpdate(formData: FormData) {
+  await requireAuth();
+  const id = z.string().uuid().parse(formData.get("id"));
+  const response = await fetch("https://api.github.com/repos/DrB0rk/TimeTone/releases/latest", { headers: { Accept: "application/vnd.github+json", "User-Agent": "TimeTone-dashboard" }, signal: AbortSignal.timeout(10000), cache: "no-store" });
+  if (!response.ok) throw new Error("Unable to check GitHub releases");
+  const release = await response.json() as { tag_name?: string; assets?: Array<{ name?: string; browser_download_url?: string }> };
+  const version = String(release.tag_name || "").replace(/^v/, "");
+  const asset = release.assets?.find((candidate) => candidate.name?.toLowerCase().endsWith(".bin") && candidate.browser_download_url);
+  if (!/^\d+\.\d+\.\d+$/.test(version) || !asset?.browser_download_url) throw new Error("The latest release has no compatible firmware image");
+  db.prepare("UPDATE devices SET ota_version = ?, ota_url = ?, ota_requested_at = ? WHERE id = ? AND approved = 1")
+    .run(version, asset.browser_download_url, new Date().toISOString(), id);
+  revalidatePath("/devices");
+}
+
 export async function saveSettings(formData: FormData) {
   await requireAuth();
   const values = {

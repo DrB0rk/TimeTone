@@ -1,16 +1,17 @@
 import { formatDistanceToNow } from "date-fns";
 import { Cpu, Pencil, Plus, SlidersHorizontal } from "lucide-react";
-import { approveDevice, rejectDevice, renameDevice, saveDeviceSettings } from "@/app/actions";
+import { approveDevice, rejectDevice, renameDevice, requestFirmwareUpdate, saveDeviceSettings } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
 import { UsbFirmwareUpdater } from "@/components/usb-firmware-updater";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getDevices } from "@/lib/db";
 
-export default function DevicesPage() {
+export default async function DevicesPage() {
   // Server-render timestamp used only for the five-minute health threshold.
   // eslint-disable-next-line react-hooks/purity
   const devices = getDevices(), now = Date.now();
+  const latestRelease = await getLatestFirmwareRelease();
   return (
     <>
       <PageHeading
@@ -23,6 +24,7 @@ export default function DevicesPage() {
           {devices.map((device) => {
             const online = !!device.last_seen_at &&
               now - new Date(device.last_seen_at).getTime() < 300000;
+            const updateAvailable = device.approved === 1 && !!latestRelease && device.firmware_version !== latestRelease.version;
             return (
               <div
                 key={device.id}
@@ -86,6 +88,13 @@ export default function DevicesPage() {
                     </dd>
                   </div>
                 </dl>
+                {device.approved === 1 && latestRelease && (updateAvailable || device.ota_version) && (
+                  <div className="mt-5 rounded-xl border border-[#d6e8ad] bg-[#f3f9e8] p-3 dark:border-[#526d3d] dark:bg-[#263b2b]">
+                    {device.ota_version
+                      ? <p className="text-sm font-medium text-[#40552c] dark:text-[#d8ff62]">Update to {device.ota_version} queued</p>
+                      : <><p className="text-sm font-medium text-[#40552c] dark:text-[#d8ff62]">Firmware {latestRelease.version} is available</p><p className="mt-1 text-xs text-[#526b38] dark:text-white/60">The terminal downloads it securely on its next online sync and restarts automatically.</p><form action={requestFirmwareUpdate} className="mt-3"><input type="hidden" name="id" value={device.id} /><Button type="submit" size="sm" className="bg-[#17211b] text-white hover:bg-[#26352c]">Start terminal update</Button></form></>}
+                  </div>
+                )}
                 {device.approved === 1 && (
                   <details className="mt-5 border-t border-black/6 pt-4">
                     <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-black/70"><SlidersHorizontal className="size-4" />Device settings</summary>
@@ -156,4 +165,14 @@ export default function DevicesPage() {
       </div>
     </>
   );
+}
+
+async function getLatestFirmwareRelease() {
+  try {
+    const response = await fetch("https://api.github.com/repos/DrB0rk/TimeTone/releases/latest", { headers: { Accept: "application/vnd.github+json", "User-Agent": "TimeTone-dashboard" }, signal: AbortSignal.timeout(5000), cache: "no-store" });
+    if (!response.ok) return null;
+    const release = await response.json() as { tag_name?: string; assets?: Array<{ name?: string }> };
+    const version = String(release.tag_name || "").replace(/^v/, "");
+    return /^\d+\.\d+\.\d+$/.test(version) && release.assets?.some((asset) => asset.name?.toLowerCase().endsWith(".bin")) ? { version } : null;
+  } catch { return null; }
 }

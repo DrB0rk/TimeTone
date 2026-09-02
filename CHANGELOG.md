@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.0] - 2026-09-02
+
+- Add secure HTTPS OTA firmware updates from approved GitHub release assets.
+- Add per-terminal update prompts and update requests in the Devices dashboard.
+
 ## [0.1.0] - 2026-08-31
 
 Initial public release.
@@ -13,4 +18,3 @@ Initial public release.
 - Configurable rounding, timezone, power, screen, and terminal settings
 - Live dashboard updates, dark mode, exports, and USB firmware updates
 - Complete workspace migration export/import
-

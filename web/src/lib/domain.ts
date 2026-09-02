@@ -46,6 +46,9 @@ export type Device = {
   screen_off_timeout_seconds: number;
   low_power_timeout_seconds: number;
   terminal_theme: string;
+  ota_version: string | null;
+  ota_url: string | null;
+  ota_requested_at: string | null;
 };
 
 export type AppSettings = {

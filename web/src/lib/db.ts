@@ -54,6 +54,9 @@ db.exec(`
     screen_off_timeout_seconds INTEGER NOT NULL DEFAULT 30,
     low_power_timeout_seconds INTEGER NOT NULL DEFAULT 120,
     terminal_theme TEXT NOT NULL DEFAULT 'light',
+    ota_version TEXT,
+    ota_url TEXT,
+    ota_requested_at TEXT,
     created_at TEXT NOT NULL,
     approved INTEGER NOT NULL DEFAULT 1
   );
@@ -100,6 +103,9 @@ for (const migration of [
   "ALTER TABLE devices ADD COLUMN terminal_theme TEXT NOT NULL DEFAULT 'light'",
   "ALTER TABLE devices ADD COLUMN screen_off_timeout_seconds INTEGER NOT NULL DEFAULT 30",
   "ALTER TABLE devices ADD COLUMN low_power_timeout_seconds INTEGER NOT NULL DEFAULT 120",
+  "ALTER TABLE devices ADD COLUMN ota_version TEXT",
+  "ALTER TABLE devices ADD COLUMN ota_url TEXT",
+  "ALTER TABLE devices ADD COLUMN ota_requested_at TEXT",
 ]) {
   try { db.exec(migration); } catch { /* column already exists */ }
 }

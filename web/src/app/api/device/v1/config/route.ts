@@ -24,6 +24,10 @@ export function GET(request: Request) {
       terminalTheme: device.terminal_theme,
       duplicateWindowSeconds: Number(settings.duplicate_window_seconds),
     },
+    firmwareUpdate: device.ota_version && device.ota_url ? {
+      version: device.ota_version,
+      url: device.ota_url,
+    } : null,
     employees: getEmployees(false).map((employee) => ({
       id: employee.id,
       name: employee.name,

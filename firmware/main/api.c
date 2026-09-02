@@ -5,6 +5,7 @@
 #include "cJSON.h"
 #include "esp_crt_bundle.h"
 #include "esp_http_client.h"
+#include "esp_https_ota.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_system.h"
@@ -18,8 +19,10 @@
 static const char *TAG = "api";
 static SemaphoreHandle_t s_wake;
 static uint16_t s_sync_interval_seconds = 5;
+static bool s_ota_in_progress;
 
 typedef struct { char *data; size_t length; size_t capacity; } response_buffer_t;
+static void ota_task(void *argument);
 
 static esp_err_t http_event(esp_http_client_event_t *event)
 {
@@ -126,9 +129,43 @@ static esp_err_t fetch_config(void)
         if (changed) { tk_config_save(&updated); tk_display_apply_settings(); }
         if (cJSON_IsString(company_name)) tk_display_set_company_name(company_name->valuestring);
     }
+    cJSON *firmware_update = cJSON_GetObjectItem(root, "firmwareUpdate");
+    if (!s_ota_in_progress && cJSON_IsObject(firmware_update)) {
+        cJSON *version = cJSON_GetObjectItem(firmware_update, "version");
+        cJSON *url = cJSON_GetObjectItem(firmware_update, "url");
+        if (cJSON_IsString(version) && cJSON_IsString(url) && strcmp(version->valuestring, TK_FIRMWARE_VERSION) != 0 && strlen(url->valuestring) < 512) {
+            char *ota_url = strdup(url->valuestring);
+            if (ota_url) {
+                s_ota_in_progress = true;
+                xTaskCreate(ota_task, "timekeep_ota", 8192, ota_url, 5, NULL);
+            }
+        }
+    }
     cJSON_Delete(root);
     tk_display_refresh();
     return err;
+}
+
+static void ota_task(void *argument)
+{
+    char *url = argument;
+    ESP_LOGI(TAG, "starting OTA update from %s", url);
+    esp_http_client_config_t http_config = {
+        .url = url,
+        .timeout_ms = 30000,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+    };
+    esp_https_ota_config_t ota_config = { .http_config = &http_config };
+    esp_err_t err = esp_https_ota(&ota_config);
+    free(url);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "OTA update complete; restarting");
+        vTaskDelay(pdMS_TO_TICKS(500));
+        esp_restart();
+    }
+    ESP_LOGE(TAG, "OTA update failed: %s", esp_err_to_name(err));
+    s_ota_in_progress = false;
+    vTaskDelete(NULL);
 }
 
 esp_err_t tk_api_submit_code(const char *code, char employee_name[48], bool *clocked_in)
