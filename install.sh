@@ -22,6 +22,18 @@ if [ -f "$SCRIPT_DIR/web/.env" ] && [ "${TIMETONE_UPDATE_IN_PROGRESS:-}" != 1 ];
       cp "$SCRIPT_DIR/web/.env" "$TMP_UPDATE/.env"
       cp -a "$NEW_SOURCE"/. "$SCRIPT_DIR"/
       cp "$TMP_UPDATE/.env" "$SCRIPT_DIR/web/.env"
+      # Native deployments keep the compiled Next.js runtime outside git.
+      # Replace it from the release asset during updates; copying source alone
+      # would otherwise leave the previous UI bundle serving stale pages.
+      INSTALLED_MODE=$(sed -n 's/^TIMETONE_INSTALL_MODE=//p' "$TMP_UPDATE/.env" | head -n 1)
+      if [ "$INSTALLED_MODE" = native ]; then
+        if curl -fsSL "https://github.com/DrB0rk/TimeTone/releases/latest/download/timetone-web.tar.gz?cachebust=$(date +%s%N)" -o "$TMP_UPDATE/timetone-web.tar.gz"; then
+          if [ -d "$SCRIPT_DIR/web/.next/standalone" ]; then mv "$SCRIPT_DIR/web/.next/standalone" "$TMP_UPDATE/old-standalone"; fi
+          tar -xzf "$TMP_UPDATE/timetone-web.tar.gz" -C "$SCRIPT_DIR"
+        else
+          printf '%s\n' "Prebuilt web bundle unavailable; the native update will build locally." >&2
+        fi
+      fi
       trap - EXIT HUP INT TERM
       export TIMETONE_UPDATE_IN_PROGRESS=1
       exec sh "$SCRIPT_DIR/install.sh" --update "$@"

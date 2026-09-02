@@ -3,6 +3,10 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.9] - 2026-09-02
+
+- Fix native in-place updates to replace the compiled web bundle instead of serving stale UI assets.
+
 ## [0.2.8] - 2026-09-02
 
 - Speed up terminal startup by making health checks independent from full configuration downloads.
