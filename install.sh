@@ -249,6 +249,10 @@ stop_native_server() {
       if kill -0 "$OLD_PID" 2>/dev/null; then kill -9 "$OLD_PID" 2>/dev/null || true; fi
     fi
   fi
+  # A manually created systemd/nohup process may not use our PID file. On a
+  # native deployment this port belongs to TimeTone, so release it before the
+  # replacement runtime starts. Ignore systems without fuser.
+  if command -v fuser >/dev/null 2>&1; then fuser -k "$PORT/tcp" >/dev/null 2>&1 || true; fi
 }
 
 if [ "$UPDATE" = true ]; then
