@@ -32,7 +32,6 @@ if [ -f "$SCRIPT_DIR/web/.env" ] && [ "${TIMETONE_UPDATE_IN_PROGRESS:-}" != 1 ];
       command -v curl >/dev/null 2>&1 || { printf '%s\n' "curl is required to update TimeTone." >&2; exit 1; }
       TMP_UPDATE=$(mktemp -d)
       trap 'rm -rf "$TMP_UPDATE"' EXIT HUP INT TERM
-      stop_before_update
       printf '%s\n' "Existing TimeTone installation detected — downloading the latest version…" >&2
       curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/refs/heads/main?cachebust=$(date +%s%N)" -o "$TMP_UPDATE/timetone.tar.gz"
       mkdir -p "$TMP_UPDATE/source"
@@ -40,6 +39,9 @@ if [ -f "$SCRIPT_DIR/web/.env" ] && [ "${TIMETONE_UPDATE_IN_PROGRESS:-}" != 1 ];
       NEW_SOURCE=$(find "$TMP_UPDATE/source" -mindepth 1 -maxdepth 1 -type d | head -n 1)
       [ -n "$NEW_SOURCE" ] || { printf '%s\n' "The update archive was empty." >&2; exit 1; }
       cp "$SCRIPT_DIR/web/.env" "$TMP_UPDATE/.env"
+      # All downloads and validation happen while the current service is still
+      # available. Stop it only once the replacement is ready to be applied.
+      stop_before_update
       cp -a "$NEW_SOURCE"/. "$SCRIPT_DIR"/
       cp "$TMP_UPDATE/.env" "$SCRIPT_DIR/web/.env"
       # Native deployments keep the compiled Next.js runtime outside git.
