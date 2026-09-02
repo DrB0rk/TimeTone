@@ -16,6 +16,11 @@ rebuild after pulling an update; choose to keep the existing configuration when
 prompted. Native installs require Node.js 20.9+ and npm and write logs to
 `web/timetone.log`.
 
+On Debian/Ubuntu, the installer can install missing system dependencies using
+`apt-get` (Docker Engine and Compose for Docker mode, Node.js 24 and npm for
+native mode). On other distributions, install the selected runtime and `tar`,
+`sed`, `find`, `curl`, and `openssl` before running it.
+
 For automation, use `./install.sh --docker --non-interactive` or
 `./install.sh --native --non-interactive` with `TIMETONE_ADMIN_PASSWORD` set.
 

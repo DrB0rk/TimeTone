@@ -58,12 +58,52 @@ if [ -z "$MODE" ]; then
 fi
 case "$MODE" in docker|native) ;; *) printf '%s\n' "Unrecognized install mode; using $DEFAULT_MODE." >&2; MODE=$DEFAULT_MODE ;; esac
 
+run_root() {
+  if [ "$(id -u)" -eq 0 ]; then "$@"; elif command -v sudo >/dev/null 2>&1; then sudo "$@"; else printf '%s\n' "This step needs root privileges. Install sudo or rerun as root: $*" >&2; exit 1; fi
+}
+ensure_base_dependencies() {
+  command -v tar >/dev/null 2>&1 && command -v sed >/dev/null 2>&1 && command -v find >/dev/null 2>&1 && return
+  if command -v apt-get >/dev/null 2>&1; then
+    printf '%s\n' "Installing required system utilities…"
+    run_root apt-get update
+    run_root apt-get install -y ca-certificates curl tar sed findutils openssl
+  else
+    printf '%s\n' "Missing required utilities (tar, sed, find). Install them with your OS package manager and rerun." >&2
+    exit 1
+  fi
+}
+ensure_base_dependencies
+
 if [ "$MODE" = docker ]; then
-  command -v docker >/dev/null 2>&1 || { printf '%s\n' "Docker is not installed. Choose --native or install Docker Engine first." >&2; exit 1; }
+  if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+    if command -v apt-get >/dev/null 2>&1; then
+      printf '%s\n' "Installing Docker Engine and Compose…"
+      run_root apt-get update
+      run_root apt-get install -y docker.io docker-compose-v2 || run_root apt-get install -y docker.io docker-compose-plugin
+      if command -v systemctl >/dev/null 2>&1; then run_root systemctl enable --now docker || true; fi
+    else
+      printf '%s\n' "Docker Compose v2 is required. Install Docker Engine and Compose, then rerun." >&2
+      exit 1
+    fi
+  fi
+  command -v docker >/dev/null 2>&1 || { printf '%s\n' "Docker installation did not provide the docker command." >&2; exit 1; }
   docker compose version >/dev/null 2>&1 || { printf '%s\n' "Docker Compose v2 is required (docker compose)." >&2; exit 1; }
 else
-  command -v node >/dev/null 2>&1 || { printf '%s\n' "Node.js 20.9 or newer is required for a native install." >&2; exit 1; }
-  command -v npm >/dev/null 2>&1 || { printf '%s\n' "npm is required for a native install." >&2; exit 1; }
+  NODE_OK=false
+  if command -v node >/dev/null 2>&1; then node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 20 ? 0 : 1)' >/dev/null 2>&1 && NODE_OK=true; fi
+  if [ "$NODE_OK" = false ] || ! command -v npm >/dev/null 2>&1; then
+    if command -v apt-get >/dev/null 2>&1; then
+      printf '%s\n' "Installing Node.js 24 and npm…"
+      run_root apt-get update
+      run_root apt-get install -y ca-certificates curl
+      curl -fsSL https://deb.nodesource.com/setup_24.x | run_root sh
+      run_root apt-get install -y nodejs
+    else
+      printf '%s\n' "Node.js 20.9+ and npm are required. Install them with your OS package manager and rerun." >&2
+      exit 1
+    fi
+  fi
+  command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1 || { printf '%s\n' "Node.js and npm installation did not complete." >&2; exit 1; }
 fi
 
 PORT=${TIMETONE_PORT:-3000}

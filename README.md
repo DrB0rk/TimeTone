@@ -42,6 +42,11 @@ native Node.js install, then asks for the admin password, timezone and LAN
 port. It creates a private `web/.env` and starts the dashboard. Open the address it prints,
 sign in, create employees, and configure the terminal. For unattended installs:
 
+On Debian and Ubuntu it also installs missing host dependencies automatically:
+Docker Engine and Compose for Docker mode, or Node.js 24 and npm for native
+mode. Other distributions should install those prerequisites with their system
+package manager first.
+
 ```bash
 TIMETONE_ADMIN_PASSWORD='use-a-long-unique-password' \
 TIMEKEEP_TIMEZONE='Europe/Amsterdam' TIMETONE_PORT=3000 \
