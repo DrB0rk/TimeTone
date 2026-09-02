@@ -6,7 +6,14 @@ export const runtime = "nodejs";
 
 const repository = "DrB0rk/TimeTone";
 function currentVersion() {
-  try { return fs.readFileSync(path.join(process.cwd(), "..", "VERSION"), "utf8").trim().replace(/^v/, ""); } catch { return "0.1.0"; }
+  for (const candidate of [path.join(process.cwd(), "..", "VERSION"), path.join(process.cwd(), "VERSION"), path.join(process.cwd(), "package.json")]) {
+    try {
+      const raw = fs.readFileSync(candidate, "utf8");
+      if (candidate.endsWith("package.json")) return (JSON.parse(raw) as { version?: string }).version || "0.1.0";
+      return raw.trim().replace(/^v/, "");
+    } catch { /* try the next deployment layout */ }
+  }
+  return "0.1.0";
 }
 function versionParts(version: string) { return version.replace(/^v/, "").split(/[+-]/)[0].split(".").map((part) => Number(part) || 0); }
 function isNewer(latest: string, current: string) {
