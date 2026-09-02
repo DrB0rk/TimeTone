@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.17] - 2026-09-02
+
+- Remove the non-interactive colour-code dot field and expand the terminal keypad.
+- Show concise selection progress in the existing status line instead.
+
 ## [0.2.16] - 2026-09-02
 
 - Prevent company names and the clock from colliding in the terminal header.

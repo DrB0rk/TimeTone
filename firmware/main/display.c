@@ -241,6 +241,10 @@ static void handle_keypress(const char *text)
             } else {
                 set_status("Checking code", 0xC47B24);
             }
+        } else {
+            char progress[40];
+            snprintf(progress, sizeof(progress), "%u of 4 colours selected", (unsigned)strlen(s_pin));
+            set_status(progress, 0xB9C6BC);
         }
     }
     update_pin_label();
@@ -395,11 +399,13 @@ static void build_clock_ui(void)
     lv_obj_set_style_text_color(settings_icon, lv_color_hex(0xD8FF62), 0);
     lv_obj_center(settings_icon);
     lv_obj_clear_flag(settings_icon, LV_OBJ_FLAG_CLICKABLE);
-    ui_text(s_main_screen, "TIME TERMINAL", 0x93A39A, 14, 66);
-    lv_obj_t *entry_card = ui_card(s_main_screen, 14, 86, 212, 52, dark_theme() ? 0x26352C : 0xFFFFFF, dark_theme() ? 0x405249 : 0xD4D8D1);
-    s_pin_label = lv_label_create(entry_card); lv_obj_set_size(s_pin_label, 188, 32); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_TRANSP, 0); lv_obj_set_style_border_width(s_pin_label, 0, 0); lv_obj_set_style_pad_left(s_pin_label, 0, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 12, 2);
-    s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 26); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_DOT); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 145);
-    s_keypad = lv_obj_create(s_main_screen); lv_obj_remove_style_all(s_keypad); lv_obj_set_size(s_keypad, 212, 104); lv_obj_set_pos(s_keypad, 14, 174);
+    ui_text(s_main_screen, "TIME TERMINAL", 0x93A39A, 14, 68);
+    ui_text(s_main_screen, "Tap your four-colour code", 0xF4F7F2, 14, 90);
+    // The selected-code dots were not actionable and consumed valuable screen
+    // area. Keep the label for state handling but intentionally hide it.
+    s_pin_label = lv_label_create(s_main_screen); lv_obj_add_flag(s_pin_label, LV_OBJ_FLAG_HIDDEN);
+    s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 24); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_DOT); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 112);
+    s_keypad = lv_obj_create(s_main_screen); lv_obj_remove_style_all(s_keypad); lv_obj_set_size(s_keypad, 212, 128); lv_obj_set_pos(s_keypad, 14, 142);
     // Keep this row-major order in sync with the web color picker:
     // top-left Coral (A), top-right Ocean (B), bottom-left Lime (C),
     // bottom-right Violet (D).
@@ -407,11 +413,11 @@ static void build_clock_ui(void)
     static const uint32_t colors[] = { 0xEF6F61, 0x3D8BFD, 0x9ACB3C, 0x9B72CF };
     for (int i = 0; i < 4; ++i) {
         lv_obj_t *button = lv_button_create(s_keypad);
-        lv_obj_set_size(button, 104, 50); lv_obj_set_pos(button, (i % 2) * 108, (i / 2) * 54);
+        lv_obj_set_size(button, 104, 62); lv_obj_set_pos(button, (i % 2) * 108, (i / 2) * 66);
         lv_obj_set_style_bg_color(button, lv_color_hex(colors[i]), 0); lv_obj_set_style_bg_color(button, lv_color_hex(0xFFFFFF), LV_STATE_PRESSED); lv_obj_set_style_radius(button, 14, 0); lv_obj_set_style_border_width(button, 0, 0); lv_obj_set_style_shadow_width(button, 5, 0); lv_obj_set_style_shadow_color(button, lv_color_hex(0x101813), 0); lv_obj_set_style_shadow_opa(button, LV_OPA_30, 0); lv_obj_add_event_cb(button, keypad_button_event, LV_EVENT_CLICKED, (void *)keys[i]);
     }
     lv_obj_t *clear = lv_button_create(s_main_screen);
-    lv_obj_set_size(clear, 212, 32); lv_obj_set_pos(clear, 14, 282);
+    lv_obj_set_size(clear, 212, 34); lv_obj_set_pos(clear, 14, 278);
     lv_obj_set_style_bg_color(clear, lv_color_hex(0x26352C), 0); lv_obj_set_style_bg_color(clear, lv_color_hex(0x405249), LV_STATE_PRESSED);
     lv_obj_set_style_text_color(clear, lv_color_hex(0xD3DED4), 0); lv_obj_set_style_text_font(clear, &lv_font_montserrat_14, 0); lv_obj_set_style_radius(clear, 10, 0); lv_obj_set_style_border_width(clear, 1, 0); lv_obj_set_style_border_color(clear, lv_color_hex(0x405249), 0);
     lv_obj_add_event_cb(clear, clear_keypad_event, LV_EVENT_CLICKED, NULL);
