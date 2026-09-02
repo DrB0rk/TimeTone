@@ -352,13 +352,15 @@ static void build_clock_ui(void)
     lv_obj_remove_style_all(s_header); lv_obj_set_size(s_header, H_RES, 46); lv_obj_set_style_bg_color(s_header, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_header, LV_OPA_COVER, 0);
     s_brand_label = lv_label_create(s_header); lv_label_set_text(s_brand_label, "TIMETONE"); lv_label_set_long_mode(s_brand_label, LV_LABEL_LONG_DOT); lv_obj_set_width(s_brand_label, 112); lv_obj_set_style_text_color(s_brand_label, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_brand_label, &lv_font_montserrat_14, 0); lv_obj_align(s_brand_label, LV_ALIGN_LEFT_MID, 14, 0);
     s_clock_label = lv_label_create(s_header); lv_obj_set_style_text_color(s_clock_label, lv_color_white(), 0); lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0); lv_obj_align(s_clock_label, LV_ALIGN_CENTER, 0, 0);
-    s_status_dot = lv_obj_create(s_header); lv_obj_remove_style_all(s_status_dot); lv_obj_set_size(s_status_dot, 10, 10); lv_obj_set_style_radius(s_status_dot, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(s_status_dot, lv_color_hex(0x788078), 0); lv_obj_align(s_status_dot, LV_ALIGN_RIGHT_MID, -58, 0);
+    s_status_dot = lv_led_create(s_header); lv_obj_set_size(s_status_dot, 10, 10); lv_led_set_color(s_status_dot, lv_color_hex(0x788078)); lv_led_on(s_status_dot); lv_obj_align(s_status_dot, LV_ALIGN_RIGHT_MID, -58, 0);
     s_sync_indicator = lv_label_create(s_header); lv_obj_set_style_text_color(s_sync_indicator, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_sync_indicator, &lv_font_montserrat_14, 0); lv_obj_align(s_sync_indicator, LV_ALIGN_RIGHT_MID, -76, 0); lv_label_set_text(s_sync_indicator, "");
     lv_obj_t *settings = lv_button_create(s_header); lv_obj_set_size(settings, 34, 28); lv_obj_align(settings, LV_ALIGN_RIGHT_MID, -14, 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x34443A), 0); lv_obj_set_style_radius(settings, 8, 0); lv_obj_set_style_border_width(settings, 0, 0); lv_obj_add_event_cb(settings, open_settings_event, LV_EVENT_CLICKED, NULL);
     // Draw a gear from simple shapes instead of a font symbol (which is not
     // present in every configured LVGL font and renders as a square).
-    lv_obj_t *gear_center = lv_obj_create(settings); lv_obj_remove_style_all(gear_center); lv_obj_set_size(gear_center, 9, 9); lv_obj_set_style_radius(gear_center, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(gear_center, lv_color_hex(0xD8FF62), 0); lv_obj_center(gear_center);
-    for (int i = 0; i < 8; ++i) { lv_obj_t *tooth = lv_obj_create(settings); lv_obj_remove_style_all(tooth); lv_obj_set_size(tooth, 4, 9); lv_obj_set_style_radius(tooth, 2, 0); lv_obj_set_style_bg_color(tooth, lv_color_hex(0xD8FF62), 0); lv_obj_center(tooth); lv_obj_set_style_transform_angle(tooth, (int16_t)(i * 450), 0); }
+    static const int8_t gear_pos[8][2] = {{15,2},{23,5},{25,12},{23,19},{15,21},{7,19},{5,12},{7,5}};
+    for (int i = 0; i < 8; ++i) { lv_obj_t *tooth = lv_obj_create(settings); lv_obj_remove_style_all(tooth); lv_obj_set_size(tooth, 5, 7); lv_obj_set_style_radius(tooth, 2, 0); lv_obj_set_style_bg_color(tooth, lv_color_hex(0xD8FF62), 0); lv_obj_set_pos(tooth, gear_pos[i][0], gear_pos[i][1]); }
+    lv_obj_t *gear_center = lv_obj_create(settings); lv_obj_remove_style_all(gear_center); lv_obj_set_size(gear_center, 13, 13); lv_obj_set_style_radius(gear_center, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(gear_center, lv_color_hex(0xD8FF62), 0); lv_obj_center(gear_center);
+    lv_obj_t *gear_hole = lv_obj_create(settings); lv_obj_remove_style_all(gear_hole); lv_obj_set_size(gear_hole, 5, 5); lv_obj_set_style_radius(gear_hole, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(gear_hole, lv_color_hex(0x34443A), 0); lv_obj_center(gear_hole);
     lv_obj_t *prompt = lv_label_create(s_main_screen); lv_label_set_text(prompt, "Clock in or out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(fg_color()), 0); lv_obj_set_pos(prompt, 14, 55);
     s_pin_label = lv_label_create(s_main_screen); lv_obj_set_size(s_pin_label, 212, 38); lv_obj_set_style_bg_color(s_pin_label, lv_color_white(), 0); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_COVER, 0); lv_obj_set_style_border_width(s_pin_label, 1, 0); lv_obj_set_style_border_color(s_pin_label, lv_color_hex(0xD4D8D1), 0); lv_obj_set_style_radius(s_pin_label, 10, 0); lv_obj_set_style_pad_left(s_pin_label, 12, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 14, 78);
     s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 30); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_WRAP); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 120);
@@ -505,7 +507,7 @@ void tk_display_set_network_state(tk_display_network_state_t state)
     _lock_acquire(&s_lvgl_lock);
     if (s_status_dot) {
         uint32_t color = state == TK_DISPLAY_ONLINE ? 0x72D572 : (state == TK_DISPLAY_OFFLINE ? 0xC43D3D : 0xD8A33A);
-        lv_obj_set_style_bg_color(s_status_dot, lv_color_hex(color), 0);
+        lv_led_set_color(s_status_dot, lv_color_hex(color)); lv_led_on(s_status_dot);
     }
     if (state != TK_DISPLAY_OFFLINE) {
         if (s_starting && state != TK_DISPLAY_ONLINE && state != TK_DISPLAY_SYNC_RETRYING) { _lock_release(&s_lvgl_lock); return; }
