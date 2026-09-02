@@ -1,110 +1,199 @@
 # TimeTone
 
-TimeTone is a self-hosted, offline-first office time clock for the
-**ESP32-2432S032 Cheap Yellow Display (CYD)**. Employees clock in and out by
-tapping a four-colour personal code. The accompanying dashboard manages the
-team, terminals, time corrections and exportable reports.
+<p align="center">
+  <img src="web/public/timetone-mark.svg" width="112" alt="TimeTone logo">
+</p>
 
-<p align="center"><img src="web/public/timetone-mark.svg" width="96" alt="TimeTone logo"></p>
+<p align="center"><strong>Office time, beautifully tracked.</strong><br>
+An offline-first time clock for the ESP32-2432S032 CYD and a polished self-hosted dashboard.</p>
 
-## What you get
+<p align="center">
+  <a href="https://github.com/DrB0rk/TimeTone/releases"><img src="https://img.shields.io/github/v/release/DrB0rk/TimeTone?style=flat-square&color=17211b&label=release" alt="Latest release"></a>
+  <a href="https://github.com/DrB0rk/TimeTone/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/DrB0rk/TimeTone/ci.yml?style=flat-square&label=CI" alt="CI status"></a>
+  <a href="https://github.com/DrB0rk/TimeTone/blob/main/LICENSE"><img src="https://img.shields.io/github/license/DrB0rk/TimeTone?style=flat-square" alt="License"></a>
+  <a href="https://github.com/DrB0rk/TimeTone"><img src="https://img.shields.io/github/stars/DrB0rk/TimeTone?style=flat-square" alt="GitHub stars"></a>
+</p>
 
-- A fast, accessible touchscreen terminal with a four-colour keypad
-- Offline queueing: a terminal retains clock events during Wi-Fi or server outages
-- Live attendance, employee management, editable time entries and audit events
-- Per-device power, screen and sync settings
-- CSV exports and exact/rounded-hours reporting
-- GitHub release update checks with native in-place updates and Docker redeploy guidance
-- Device setup portal, secure per-device credentials and browser USB updates
-- A single-container dashboard with SQLite storage and a persistent Docker volume
+TimeTone gives a small team a fast, friendly way to clock in and out. An
+employee taps their four-colour code on the terminal; the server records the
+event, rounds time to your configured interval, and updates the live office
+overview. Wi-Fi outages do not lose punches: the terminal queues events and
+synchronises when connectivity returns.
 
-## Install the dashboard
+## Product overview
 
-On a Linux host, install the latest version directly with one command:
+```mermaid
+flowchart LR
+  E[Employee] -->|4 colour taps| T[ESP32 CYD terminal]
+  T -->|clock event| API[TimeTone API]
+  API --> DB[(SQLite database)]
+  API --> LIVE[Live updates]
+  LIVE --> UI[Dashboard]
+  UI --> R[Reports & exports]
+  UI --> M[Migration backup]
+  T -. offline queue .-> Q[(Local event queue)]
+  Q -. resync .-> API
+```
+
+| Area | Included |
+| --- | --- |
+| Terminal | LVGL portrait UI, always-visible four-colour keypad, clear button, setup AP, offline queue, low-power and screen-off modes |
+| Attendance | Automatic clock-in/out, 15-minute rounding (configurable), duplicate protection, auto-close, auto-merge, manual corrections |
+| Dashboard | Live overview, office presence canvas, employees, devices, entries, events, reports, dark mode, responsive layouts |
+| Operations | Device approval, configurable terminal settings, USB Web Serial firmware updates, GitHub release updater |
+| Data | CSV exports, audit trail, complete workspace migration import/export, persistent SQLite storage |
+
+## Install in one command
+
+On Debian or Ubuntu, this interactive installer can install missing host
+dependencies as well as TimeTone. It downloads the latest repository into
+`./TimeTone`, then offers Docker or native Node.js installation:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/DrB0rk/TimeTone/main/install.sh | sh
 ```
 
-The script downloads a release checkout into `./TimeTone` and starts the
-interactive installer. Set `TIMETONE_INSTALL_DIR` to choose another location.
+The installer asks for:
 
-You can also clone the repository and run the same installer locally:
+1. Deployment mode — Docker or native Node.js
+2. Admin password (hidden input, minimum 8 characters)
+3. Office timezone (IANA format, for example `Europe/Amsterdam`)
+4. LAN port (default `3000`)
+
+It finishes with a health check and prints the exact LAN URL and port.
+
+Choose a mode explicitly:
 
 ```bash
-git clone https://github.com/DrB0rk/TimeTone.git
+curl -fsSL https://raw.githubusercontent.com/DrB0rk/TimeTone/main/install.sh | sh -s -- --docker
+curl -fsSL https://raw.githubusercontent.com/DrB0rk/TimeTone/main/install.sh | sh -s -- --native
+```
+
+For automation:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DrB0rk/TimeTone/main/install.sh | \
+  TIMETONE_ADMIN_PASSWORD='use-a-long-unique-password' \
+  TIMEKEEP_TIMEZONE='Europe/Amsterdam' TIMETONE_PORT=3000 \
+  sh -s -- --docker --non-interactive
+```
+
+Set `TIMETONE_INSTALL_DIR` to choose another installation directory. Native
+installs require Node.js 20.9+ and npm; Debian/Ubuntu installs bootstrap
+Node.js 24 automatically. See [deployment and operations](docs/DEPLOYMENT.md)
+for non-Debian systems, HTTPS, services, backups, and security.
+
+## First setup
+
+```mermaid
+sequenceDiagram
+  participant I as Installer
+  participant D as Dashboard
+  participant C as CYD terminal
+  I->>D: Start and create admin account
+  D-->>I: LAN URL and health status
+  C->>C: Start setup Wi-Fi AP
+  I->>C: Enter office Wi-Fi and dashboard URL
+  C->>D: Pair device
+  D-->>I: Approve device
+  I->>D: Add employees and colour codes
+  C->>D: Sync employees and clock events
+```
+
+1. Open the printed dashboard URL and sign in.
+2. Add employees under **Employees** and assign each a four-colour code.
+3. Flash a terminal using the [firmware guide](firmware/README.md).
+4. Join the displayed `TimeTone-XXXX` setup network (default password:
+   `timekeep`) and visit `http://192.168.4.1`.
+5. Enter the office 2.4 GHz Wi-Fi and dashboard URL.
+6. Approve the pending terminal under **Devices**.
+
+The terminal falls back to its setup AP when saved Wi-Fi is unavailable. No
+device token needs to be typed into the setup portal; pairing creates a unique
+credential automatically.
+
+## Updating
+
+In the dashboard, open **Settings → Software updates** and choose **Check for
+updates**. The updater reads stable releases from GitHub, shows release notes,
+and supports direct installation for native deployments while preserving the
+database and `.env` file.
+
+For Docker, use the release information shown in the dashboard and update from
+the host:
+
+```bash
 cd TimeTone
-./install.sh
+git pull
+./install.sh --docker
 ```
 
-The installer is interactive by default: it asks whether to use Docker or a
-native Node.js install, then asks for the admin password, timezone and LAN
-port. It creates a private `web/.env` and starts the dashboard. Open the address it prints,
-sign in, create employees, and configure the terminal. For unattended installs:
+Native update logs are written to `web/timetone.log`; the previous install is
+kept as a rollback copy. Read [versioning and releases](docs/VERSIONING.md) for
+the SemVer and tagging protocol.
 
-On Debian and Ubuntu it also installs missing host dependencies automatically:
-Docker Engine and Compose for Docker mode, or Node.js 24 and npm for native
-mode. Other distributions should install those prerequisites with their system
-package manager first.
+## Move to another server
 
-```bash
-TIMETONE_ADMIN_PASSWORD='use-a-long-unique-password' \
-TIMEKEEP_TIMEZONE='Europe/Amsterdam' TIMETONE_PORT=3000 \
-./install.sh --non-interactive
-```
+Use **Settings → Migration** to download one complete JSON migration file. It
+contains workspace settings, employees, devices, time entries, terminal
+events, and audit history. Upload it in the same section on the destination
+server. Restore is validated and transactional; a failed import rolls back.
 
-To select a mode explicitly, use `./install.sh --docker` or
-`./install.sh --native`. Native installs require Node.js 20.9+ and npm; the
-dashboard runs as a background process with logs in `web/timetone.log`.
-
-See [deployment and operations](docs/DEPLOYMENT.md) for HTTPS, backups and
-updates. An HTTPS address (or `localhost`) is required for browser USB updates
-because Web Serial is a secure-context browser feature.
-
-## Set up a terminal
-
-1. Flash a factory-fresh ESP32-2432S032 using the [firmware instructions](firmware/README.md).
-2. Join the displayed `TimeTone-XXXX` Wi-Fi network (default password: `timekeep`).
-3. Visit `http://192.168.4.1`, enter office Wi-Fi and the dashboard URL.
-4. Approve the new terminal from **Devices** in the dashboard.
-5. Create employees and assign their four-colour codes in **Employees**.
-
-Terminals automatically fall back to their setup Wi-Fi when saved Wi-Fi cannot
-be joined. Keep the initial setup network physically controlled; it is intended
-for provisioning rather than general office Wi-Fi access.
-
-## Repository layout
-
-- `firmware/` — ESP-IDF 6 + LVGL firmware for the CYD
-- `web/` — Next.js dashboard, REST API, and SQLite-backed server
-- `docs/` — hardware, API, operations, and deployment documentation
+Migration replaces the destination workspace, so always export a backup first
+and protect the file as confidential attendance data.
 
 ## Development
 
 ```bash
-# Web application
-cd web
+git clone https://github.com/DrB0rk/TimeTone.git
+cd TimeTone/web
 cp .env.example .env
 deno install --allow-scripts=npm:better-sqlite3
-npm run dev
+npm test
+npm run lint
+npx tsc --noEmit
+DATABASE_PATH=./data/timekeep.db npm run build
+```
 
-# Firmware (in another shell)
+Build and flash the ESP32 firmware in another shell:
+
+```bash
 cd firmware
 source /home/drb0rk/.espressif/v6.0.1/esp-idf/export.sh
 idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
-The dashboard has no demo employees or devices by default. The development
-password is only the value in your local `web/.env`; set a unique password and
-secret before exposing it to a network.
+The project uses ESP-IDF 6, LVGL 9.3, Next.js, and SQLite. CI runs the web
+tests/lint/build and the ESP-IDF firmware build on every push and pull request.
 
-See [Getting started](docs/GETTING_STARTED.md), [hardware](docs/HARDWARE.md),
-[deployment](docs/DEPLOYMENT.md), and the [device API](docs/API.md).
+## Repository map
 
-## Support and security
+```text
+TimeTone/
+├── firmware/       ESP-IDF + LVGL terminal firmware
+├── web/             Next.js dashboard, API, and SQLite access
+├── docs/            Getting started, hardware, API, deployment, versioning
+├── scripts/         Native release update helper
+├── install.sh       Interactive Docker/native installer
+└── CHANGELOG.md    Release history
+```
 
-Please read [the security guidance](docs/DEPLOYMENT.md#security-checklist)
-before exposing TimeTone beyond a trusted LAN. File product issues in this
-repository; do not include credentials, employee data or device tokens in
-public issues.
+## Security and privacy
+
+TimeTone is designed for a trusted LAN. Use a unique admin password and secret,
+put internet-facing deployments behind HTTPS, restrict dashboard access where
+possible, and protect migration files, SQLite backups, exports, and `web/.env`.
+Employee colour codes are credential material and should not be shared in
+issues or screenshots. See the [security checklist](docs/DEPLOYMENT.md#security-checklist).
+
+## Contributing
+
+Issues and pull requests are welcome. Please include reproduction steps and
+avoid posting employee data, credentials, or device tokens. Before opening a
+pull request, run the checks listed in **Development** and update
+`CHANGELOG.md` for user-visible changes.
+
+## License
+
+See [LICENSE](LICENSE).
