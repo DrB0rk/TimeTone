@@ -20,8 +20,16 @@ team, terminals, time corrections and exportable reports.
 
 ## Install the dashboard
 
-On a Linux host with Docker Engine and Docker Compose v2, clone a release and
-run the interactive installer:
+On a Linux host, install the latest version directly with one command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DrB0rk/TimeTone/main/install.sh | sh
+```
+
+The script downloads a release checkout into `./TimeTone` and starts the
+interactive installer. Set `TIMETONE_INSTALL_DIR` to choose another location.
+
+You can also clone the repository and run the same installer locally:
 
 ```bash
 git clone https://github.com/DrB0rk/TimeTone.git

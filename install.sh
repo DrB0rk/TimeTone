@@ -1,7 +1,24 @@
 #!/usr/bin/env sh
 set -eu
 
-ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ ! -f "$SCRIPT_DIR/web/package.json" ]; then
+  command -v curl >/dev/null 2>&1 || { printf '%s\n' "curl is required for one-command installation." >&2; exit 1; }
+  INSTALL_DIR=${TIMETONE_INSTALL_DIR:-"$(pwd)/TimeTone"}
+  [ -d "$INSTALL_DIR/web" ] || {
+    TMP_DIR=$(mktemp -d)
+    trap 'rm -rf "$TMP_DIR"' EXIT HUP INT TERM
+    printf '%s\n' "Downloading the latest TimeTone release…"
+    curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/refs/heads/main" -o "$TMP_DIR/timetone.tar.gz"
+    mkdir -p "$TMP_DIR/source"
+    tar -xzf "$TMP_DIR/timetone.tar.gz" -C "$TMP_DIR/source"
+    SOURCE_DIR=$(find "$TMP_DIR/source" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+    mkdir -p "$INSTALL_DIR"
+    cp -R "$SOURCE_DIR"/. "$INSTALL_DIR"/
+  }
+  exec sh "$INSTALL_DIR/install.sh" "$@"
+fi
+ROOT_DIR=$SCRIPT_DIR
 WEB_DIR="$ROOT_DIR/web"
 NON_INTERACTIVE=false
 FORCE=false
@@ -43,6 +60,12 @@ if [ "$MODE" = docker ]; then
 else
   command -v node >/dev/null 2>&1 || { printf '%s\n' "Node.js 20.9 or newer is required for a native install." >&2; exit 1; }
   command -v npm >/dev/null 2>&1 || { printf '%s\n' "npm is required for a native install." >&2; exit 1; }
+fi
+
+PORT=${TIMETONE_PORT:-3000}
+if [ -f "$WEB_DIR/.env" ] && [ -z "${TIMETONE_PORT:-}" ]; then
+  EXISTING_PORT=$(sed -n 's/^TIMETONE_PORT=//p' "$WEB_DIR/.env" | head -n 1)
+  [ -n "$EXISTING_PORT" ] && PORT=$EXISTING_PORT
 fi
 
 if [ -f "$WEB_DIR/.env" ] && [ "$FORCE" = false ] && [ "$NON_INTERACTIVE" = false ]; then
