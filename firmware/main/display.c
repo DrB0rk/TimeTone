@@ -434,6 +434,7 @@ esp_err_t tk_display_init(void)
     const esp_timer_create_args_t tick_args = { .callback = tick_cb, .name = "lvgl_tick" };
     esp_timer_handle_t timer; ESP_ERROR_CHECK(esp_timer_create(&tick_args, &timer)); ESP_ERROR_CHECK(esp_timer_start_periodic(timer, 2000));
     build_clock_ui(); build_setup_ui(); build_settings_ui(); build_calibration_ui(); tk_display_refresh();
+    char current_ip[16]; tk_network_ip(current_ip, sizeof(current_ip)); tk_display_set_ip(current_ip);
     xTaskCreate(lvgl_task, "lvgl", 6144, NULL, 5, NULL);
     s_last_activity_us = esp_timer_get_time(); set_backlight(true);
     ESP_LOGI(TAG, "display initialized");
