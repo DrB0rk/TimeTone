@@ -3,6 +3,10 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.6] - 2026-09-02
+
+- Confirm Docker update completion after the old container is replaced.
+
 ## [0.2.5] - 2026-09-02
 
 - Fix installed-version detection in containerized deployments.
