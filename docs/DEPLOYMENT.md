@@ -86,8 +86,13 @@ database volume.
 
 ### Updating firmware
 
-Use **Devices → USB firmware update** in a supported browser. Select the
-`timetone.bin` application image from a compatible release/build; existing
-terminal configuration is preserved. The partition table also contains two
-1.8 MiB OTA slots, but TimeTone currently ships operator-initiated USB updates
-rather than unattended OTA rollouts.
+For unattended updates, open **Devices**. Approved terminals with an older
+firmware version show the latest stable GitHub release and a **Start terminal
+update** button. Starting an update queues the release application image for
+that terminal; it downloads the image over HTTPS on the next online config
+sync, verifies it with ESP-IDF OTA, and reboots. The device reports its new
+version on the next heartbeat and the queue is cleared automatically.
+
+Use **Devices → USB firmware update** in a supported browser as a recovery or
+first-flash path. Select the `timetone.bin` image from a compatible release or
+build; existing terminal configuration is preserved.

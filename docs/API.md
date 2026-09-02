@@ -17,6 +17,9 @@ endpoints accept that credential.
 Returns server time, workspace settings, device identity, and active employees.
 Employee names and clock state are returned for display only. Access codes stay
 on the server; the terminal submits a color sequence to the clock endpoint.
+When an update is queued for the device, the response also includes
+`firmwareUpdate: { "version": "x.y.z", "url": "https://..." }`. The terminal
+downloads that image over HTTPS and reboots after a successful OTA update.
 
 ## `POST /api/device/v1/clock`
 

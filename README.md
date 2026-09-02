@@ -119,6 +119,12 @@ updates**. The updater reads stable releases from GitHub, shows release notes,
 and supports direct installation for native deployments while preserving the
 database and `.env` file.
 
+Approved terminals can also be updated remotely from **Devices**. When a newer
+stable GitHub release is available, choose **Start terminal update**; the
+terminal downloads and verifies the release image over HTTPS during its next
+online sync, then reboots and reports the new version. USB Web Serial remains
+available for first flash and recovery.
+
 For Docker, use the release information shown in the dashboard and update from
 the host:
 
