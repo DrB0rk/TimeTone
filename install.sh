@@ -5,7 +5,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # Pin the bootstrap payload so a stale CDN response for the moving `main`
 # branch cannot reinstall an older runtime. Bump this with each published
 # installer revision; callers may override it for a private fork.
-SOURCE_REF=${TIMETONE_SOURCE_REF:-adbd822}
+SOURCE_REF=${TIMETONE_SOURCE_REF:-8e0c4dd}
 
 stop_port_processes() {
   STOP_PORT=$1
