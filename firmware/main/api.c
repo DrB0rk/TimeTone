@@ -27,10 +27,14 @@ static volatile bool s_force_config;
 static TickType_t s_next_pair_attempt;
 static TickType_t s_next_config_attempt;
 static volatile bool s_clock_request_in_flight;
-// A colour code is the terminal's interactive path. Retain its HTTP client so
-// TLS is negotiated once rather than again for every employee.
+// Keep one connection for interactive clock requests and one for the normal
+// API cadence.  Before this, heartbeat, config and event requests each opened
+// a fresh TLS session, which made a "sync" take several seconds on an ESP32
+// even while the server itself was already responding.
 static esp_http_client_handle_t s_clock_client;
+static esp_http_client_handle_t s_background_client;
 static char s_clock_client_server[160];
+static char s_background_client_server[160];
 static bool s_clock_connection_warmed;
 
 typedef struct { char *data; size_t length; size_t capacity; } response_buffer_t;
@@ -77,19 +81,27 @@ static int request(const char *path, esp_http_client_method_t method, const char
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
     // Settings may change the server URL from the terminal web UI. Dispose of
-    // the retained connection only in that case, then establish a fresh one.
-    if (is_clock && s_clock_client && strcmp(s_clock_client_server, config->server_url) != 0) {
+    // the retained connections only in that case, then establish fresh ones.
+    if (s_clock_client && strcmp(s_clock_client_server, config->server_url) != 0) {
         esp_http_client_cleanup(s_clock_client);
         s_clock_client = NULL;
         s_clock_client_server[0] = 0;
         s_clock_connection_warmed = false;
     }
-    esp_http_client_handle_t client = is_clock ? s_clock_client : NULL;
+    if (s_background_client && strcmp(s_background_client_server, config->server_url) != 0) {
+        esp_http_client_cleanup(s_background_client);
+        s_background_client = NULL;
+        s_background_client_server[0] = 0;
+    }
+    esp_http_client_handle_t client = is_clock ? s_clock_client : s_background_client;
     if (!client) {
         client = esp_http_client_init(&client_config);
         if (is_clock && client) {
             s_clock_client = client;
             strlcpy(s_clock_client_server, config->server_url, sizeof(s_clock_client_server));
+        } else if (client) {
+            s_background_client = client;
+            strlcpy(s_background_client_server, config->server_url, sizeof(s_background_client_server));
         }
     }
     if (!client) return -1;
@@ -104,7 +116,9 @@ static int request(const char *path, esp_http_client_method_t method, const char
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_header(client, "Accept", "application/json");
     esp_http_client_set_header(client, "User-Agent", "TimeTone-Terminal/" TK_FIRMWARE_VERSION);
-    if (body) esp_http_client_set_post_field(client, body, strlen(body));
+    // Explicitly clear a previous POST body before a reused client performs a
+    // GET (for example heartbeat followed by the full configuration fetch).
+    esp_http_client_set_post_field(client, body, body ? strlen(body) : 0);
     int64_t started_us = esp_timer_get_time();
     esp_err_t err = esp_http_client_perform(client);
     // A 401 response can make esp_http_client return ESP_ERR_NOT_SUPPORTED
@@ -115,9 +129,9 @@ static int request(const char *path, esp_http_client_method_t method, const char
     int64_t elapsed_ms = (esp_timer_get_time() - started_us) / 1000;
     if (err != ESP_OK) ESP_LOGW(TAG, "%s failed after %lldms: %s", path, elapsed_ms, esp_err_to_name(err));
     else if (strstr(path, "/clock") && elapsed_ms > 1000) ESP_LOGW(TAG, "slow clock request: %lldms", elapsed_ms);
-    // Keep only the interactive client alive. All bulk/background clients are
-    // deliberately short-lived so they cannot hold stale configuration.
-    if (!is_clock) esp_http_client_cleanup(client);
+    // Both clients are intentionally retained. esp_http_client reconnects if
+    // the peer has closed an idle socket, while healthy connections avoid a
+    // DNS/TCP/TLS round trip on every sync.
     return status;
 }
 
@@ -378,13 +392,18 @@ static void api_task(void *argument)
         bool config_due = (first_sync || s_force_config || s_config_elapsed >= full_sync_seconds) &&
             xTaskGetTickCount() >= s_next_config_attempt;
         if (tk_network_connected() && tk_config_get()->configured && !tk_display_is_sleeping() && !s_clock_request_in_flight) {
-            // Deliver one durable, interactive request before any periodic
-            // work. A code has already been acknowledged on-screen and is
-            // safely in NVS; this is the earliest opportunity to confirm it.
-            esp_err_t code_result = push_code_requests();
-            if (code_result == ESP_FAIL) {
-                if (s_sync_failures < 5) s_sync_failures++;
-                tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING);
+            // A warmed clock connection is the normal case, so deliver a
+            // scan immediately. After wake or boot, first let heartbeat()
+            // establish both background and clock TLS sessions; sending the
+            // first scan through a cold connection was the source of the
+            // multi-second "checking" delay.
+            bool clock_was_warm = s_clock_connection_warmed;
+            if (clock_was_warm) {
+                esp_err_t code_result = push_code_requests();
+                if (code_result == ESP_FAIL) {
+                    if (s_sync_failures < 5) s_sync_failures++;
+                    tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING);
+                }
             }
             // The short interval is a genuine health check. Do not start a
             // full download or event upload until authentication is known to
@@ -392,6 +411,16 @@ static void api_task(void *argument)
             int health_status = heartbeat();
             if (health_status == 200) {
                 s_sync_failures = 0;
+                // heartbeat() warms the retained clock client when needed.
+                // Submit any scan that arrived during wake-up only after that
+                // warm-up, so its request can reuse the established session.
+                if (!clock_was_warm) {
+                    esp_err_t code_result = push_code_requests();
+                    if (code_result == ESP_FAIL) {
+                        if (s_sync_failures < 5) s_sync_failures++;
+                        tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING);
+                    }
+                }
                 if (config_due) {
                     tk_display_set_network_state(TK_DISPLAY_SYNCING);
                     esp_err_t config_result = fetch_config();

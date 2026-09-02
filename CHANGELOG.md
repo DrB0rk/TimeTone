@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.24] - 2026-09-02
+
+- Reuse retained HTTPS clients for the terminal's health, settings, and event syncs instead of opening a new TLS connection for every request.
+- Warm the clock connection before delivering a queued code after startup or wake, reducing the first-entry delay.
+
 ## [0.2.23] - 2026-09-02
 
 - Fix a terminal restart when opening the team-status page by keeping its employee snapshot out of the LVGL task stack.
