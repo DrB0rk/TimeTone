@@ -21,6 +21,8 @@ static SemaphoreHandle_t s_wake;
 static uint16_t s_sync_interval_seconds = 5;
 static bool s_ota_in_progress;
 static uint8_t s_sync_failures;
+static uint32_t s_config_elapsed;
+static uint32_t s_heartbeat_elapsed;
 
 typedef struct { char *data; size_t length; size_t capacity; } response_buffer_t;
 static void ota_task(void *argument);
@@ -245,24 +247,38 @@ static void heartbeat(void)
 
 static void api_task(void *argument)
 {
+    bool first_sync = true;
     while (true) {
+        uint16_t base_seconds = tk_config_get()->sync_interval_seconds ?: s_sync_interval_seconds;
+        bool config_due = first_sync || s_config_elapsed >= 30;
         if (tk_network_connected() && tk_config_get()->configured && !tk_display_is_sleeping()) {
-            tk_display_set_network_state(TK_DISPLAY_SYNCING);
-            // Keep the terminal's employee list fresh while the server is
-            // being configured, and after an administrator approves pairing.
-            // The response is small and this avoids a long stale-PIN window.
-            esp_err_t config_result = fetch_config();
+            esp_err_t config_result = ESP_OK;
+            if (config_due) {
+                tk_display_set_network_state(TK_DISPLAY_SYNCING);
+                // Employee/config refresh is intentionally less frequent than
+                // event delivery. This avoids repeatedly downloading the same
+                // payload and keeps the keypad responsive.
+                config_result = fetch_config();
+                s_config_elapsed = 0;
+                first_sync = false;
+            }
             push_events();
-            heartbeat();
-            if (config_result == ESP_OK) { s_sync_failures = 0; tk_display_set_network_state(TK_DISPLAY_ONLINE); }
-            else { if (s_sync_failures < 5) s_sync_failures++; tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING); }
+            if (s_heartbeat_elapsed >= 15 || config_due) { heartbeat(); s_heartbeat_elapsed = 0; }
+            if (config_due) {
+                if (config_result == ESP_OK) { s_sync_failures = 0; tk_display_set_network_state(TK_DISPLAY_ONLINE); }
+                else { if (s_sync_failures < 5) s_sync_failures++; tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING); }
+            }
         }
-        uint16_t seconds = tk_config_get()->sync_interval_seconds ?: s_sync_interval_seconds;
+        uint16_t seconds = base_seconds;
         if (s_sync_failures) {
             uint16_t multiplier = 1u << (s_sync_failures > 4 ? 4 : s_sync_failures);
             seconds = seconds > (60 / multiplier) ? 60 : seconds * multiplier;
         }
-        xSemaphoreTake(s_wake, pdMS_TO_TICKS(seconds * 1000));
+        uint32_t before = xTaskGetTickCount() / configTICK_RATE_HZ;
+        bool woken = xSemaphoreTake(s_wake, pdMS_TO_TICKS(seconds * 1000)) == pdTRUE;
+        uint32_t after = xTaskGetTickCount() / configTICK_RATE_HZ;
+        uint32_t elapsed = woken ? (after - before) : seconds;
+        s_config_elapsed += elapsed; s_heartbeat_elapsed += elapsed;
     }
 }
 
