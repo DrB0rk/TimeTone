@@ -45,13 +45,14 @@ static const char *TAG = "display";
 static _lock_t s_lvgl_lock;
 static lv_display_t *s_display;
 static lv_obj_t *s_main_screen, *s_setup_screen, *s_settings_screen, *s_calibration_screen, *s_header;
-static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_count_label, *s_brand_label, *s_ip_label;
+static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_count_label, *s_brand_label, *s_ip_label, *s_server_label;
 static lv_obj_t *s_sync_indicator;
 static lv_obj_t *s_setup_details;
 static char s_pin[9];
 static bool s_online;
 static tk_display_network_state_t s_network_state = TK_DISPLAY_OFFLINE;
 static uint8_t s_sync_frame;
+static volatile bool s_entry_in_progress;
 static bool s_calibrating, s_calibration_wait_release;
 static uint8_t s_calibration_step;
 static uint16_t s_calibration_x[4], s_calibration_y[4];
@@ -204,22 +205,39 @@ static void update_pin_label(void)
     lv_obj_set_style_text_color(s_pin_label, lv_color_hex(hidden[0] ? 0x17211B : 0x788078), 0);
 }
 
+static void code_submit_task(void *argument)
+{
+    char code[8]; strlcpy(code, (const char *)argument, sizeof(code)); free(argument);
+    char employee_name[48] = {0}; bool clocked_in = false;
+    esp_err_t err = tk_api_submit_code(code, employee_name, &clocked_in);
+    _lock_acquire(&s_lvgl_lock);
+    s_entry_in_progress = false;
+    if (err == ESP_ERR_NOT_FOUND) set_status("Code not recognised - try again", 0xC43D3D);
+    else if (err == ESP_ERR_INVALID_STATE || err == ESP_FAIL) set_status("Offline - connect to clock in", 0xC47B24);
+    else if (err == ESP_OK) {
+        char message[96]; snprintf(message, sizeof(message), "%s, %s!", clocked_in ? "Welcome" : "Goodbye", employee_name);
+        set_status(message, clocked_in ? 0x168455 : 0x526159);
+        tk_api_wake();
+    } else set_status("Could not reach server - try again", 0xC47B24);
+    _lock_release(&s_lvgl_lock);
+    vTaskDelete(NULL);
+}
+
 static void handle_keypress(const char *text)
 {
     if (!text) return;
+    if (s_entry_in_progress) return;
     if (strlen(s_pin) < 4) {
         strlcat(s_pin, text, sizeof(s_pin));
         if (strlen(s_pin) == 4) {
-            char employee_name[48]; bool clocked_in = false;
-            esp_err_t err = tk_api_submit_code(s_pin, employee_name, &clocked_in);
-            if (err == ESP_ERR_NOT_FOUND) set_status("Code not recognised - try again", 0xC43D3D);
-            else if (err == ESP_ERR_INVALID_STATE || err == ESP_FAIL) set_status("Offline - connect to clock in", 0xC47B24);
-            else if (err == ESP_OK) {
-                char message[96]; snprintf(message, sizeof(message), "%s, %s!", clocked_in ? "Welcome" : "Goodbye", employee_name);
-                set_status(message, clocked_in ? 0x168455 : 0x526159);
-                tk_api_wake();
-            }
+            char *code = strdup(s_pin);
             s_pin[0] = 0;
+            s_entry_in_progress = true;
+            if (!code || xTaskCreate(code_submit_task, "code_submit", 4096, code, 4, NULL) != pdPASS) {
+                free(code); s_entry_in_progress = false; set_status("Could not send code - try again", 0xC47B24);
+            } else {
+                set_status("Checking code", 0xC47B24);
+            }
         }
     }
     update_pin_label();
@@ -253,7 +271,10 @@ static void sync_animation_timer(lv_timer_t *timer)
     (void)timer;
     if (!s_sync_indicator) return;
     const char *frames[] = { "", ".", "..", "..." };
-    if (s_network_state == TK_DISPLAY_CONNECTING || s_network_state == TK_DISPLAY_SYNCING) {
+    if (s_entry_in_progress) {
+        char text[32]; snprintf(text, sizeof(text), "Checking code%s", frames[s_sync_frame++ % 4]);
+        set_status(text, 0xC47B24);
+    } else if (s_network_state == TK_DISPLAY_CONNECTING || s_network_state == TK_DISPLAY_SYNCING) {
         char text[8]; snprintf(text, sizeof(text), "%s", frames[s_sync_frame++ % 4]);
         lv_label_set_text(s_sync_indicator, text);
     } else {
@@ -371,10 +392,11 @@ static void build_settings_ui(void)
     lv_obj_t *title = lv_label_create(s_settings_screen); lv_label_set_text(title, "TERMINAL SETTINGS"); lv_obj_set_style_text_color(title, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0); lv_obj_set_pos(title, 18, 18);
     lv_obj_t *subtitle = lv_label_create(s_settings_screen); lv_label_set_text(subtitle, "Display and touch controls"); lv_obj_set_style_text_color(subtitle, lv_color_hex(0xC8D0C9), 0); lv_obj_set_style_text_font(subtitle, &lv_font_montserrat_14, 0); lv_obj_set_pos(subtitle, 18, 44);
     s_ip_label = lv_label_create(s_settings_screen); lv_obj_set_style_text_color(s_ip_label, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_ip_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_ip_label, 18, 68); lv_label_set_text(s_ip_label, "IP: 0.0.0.0");
-    settings_button(s_settings_screen, "TOGGLE LIGHT / DARK", 94, settings_theme_event);
-    settings_button(s_settings_screen, "CALIBRATE TOUCH", 144, settings_calibrate_event);
-    lv_obj_t *hint_card = lv_obj_create(s_settings_screen); lv_obj_remove_style_all(hint_card); lv_obj_set_size(hint_card, 204, 60); lv_obj_set_pos(hint_card, 18, 198); lv_obj_set_style_bg_color(hint_card, lv_color_hex(0x26352C), 0); lv_obj_set_style_radius(hint_card, 12, 0);
-    s_calibration_hint = lv_label_create(hint_card); lv_label_set_text(s_calibration_hint, "Calibration uses 4 corner taps\nfor accurate input."); lv_obj_set_style_text_font(s_calibration_hint, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(s_calibration_hint, lv_color_white(), 0); lv_obj_set_pos(s_calibration_hint, 12, 12);
+    s_server_label = lv_label_create(s_settings_screen); lv_obj_set_width(s_server_label, 204); lv_label_set_long_mode(s_server_label, LV_LABEL_LONG_DOT); lv_obj_set_style_text_color(s_server_label, lv_color_hex(0xA9B6A9), 0); lv_obj_set_style_text_font(s_server_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_server_label, 18, 86); lv_label_set_text(s_server_label, "Server: not configured");
+    settings_button(s_settings_screen, "TOGGLE LIGHT / DARK", 110, settings_theme_event);
+    settings_button(s_settings_screen, "CALIBRATE TOUCH", 160, settings_calibrate_event);
+    lv_obj_t *hint_card = lv_obj_create(s_settings_screen); lv_obj_remove_style_all(hint_card); lv_obj_set_size(hint_card, 204, 48); lv_obj_set_pos(hint_card, 18, 212); lv_obj_set_style_bg_color(hint_card, lv_color_hex(0x26352C), 0); lv_obj_set_style_radius(hint_card, 12, 0);
+    s_calibration_hint = lv_label_create(hint_card); lv_label_set_text(s_calibration_hint, "Calibration uses 4 corner taps."); lv_obj_set_style_text_font(s_calibration_hint, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(s_calibration_hint, lv_color_white(), 0); lv_obj_set_pos(s_calibration_hint, 12, 16);
     settings_button(s_settings_screen, "BACK", 274, settings_back_event);
 }
 
@@ -435,6 +457,7 @@ esp_err_t tk_display_init(void)
     esp_timer_handle_t timer; ESP_ERROR_CHECK(esp_timer_create(&tick_args, &timer)); ESP_ERROR_CHECK(esp_timer_start_periodic(timer, 2000));
     build_clock_ui(); build_setup_ui(); build_settings_ui(); build_calibration_ui(); tk_display_refresh();
     char current_ip[16]; tk_network_ip(current_ip, sizeof(current_ip)); tk_display_set_ip(current_ip);
+    if (s_server_label) lv_label_set_text_fmt(s_server_label, "Server: %s", tk_config_get()->server_url[0] ? tk_config_get()->server_url : "not configured");
     xTaskCreate(lvgl_task, "lvgl", 6144, NULL, 5, NULL);
     s_last_activity_us = esp_timer_get_time(); set_backlight(true);
     ESP_LOGI(TAG, "display initialized");
