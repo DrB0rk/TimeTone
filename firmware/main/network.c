@@ -24,6 +24,8 @@ static const int CONNECTED_BIT = BIT0;
 static char s_ap_ssid[33];
 static char s_ip[16] = "0.0.0.0";
 static bool s_ap_started;
+static uint8_t s_connect_attempts;
+static bool s_fallback_active;
 static httpd_handle_t s_server;
 
 static const char SETUP_HTML_HEAD[] =
@@ -157,16 +159,23 @@ static void start_sntp_once(void)
 
 static void event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
-    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) { tk_display_set_network_state(TK_DISPLAY_CONNECTING); esp_wifi_connect(); }
+    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) { s_connect_attempts = 0; s_fallback_active = false; tk_display_set_network_state(TK_DISPLAY_CONNECTING); esp_wifi_connect(); }
     else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         xEventGroupClearBits(s_events, CONNECTED_BIT);
-        tk_display_set_network_state(TK_DISPLAY_OFFLINE);
-        esp_wifi_connect();
+        if (!s_fallback_active && ++s_connect_attempts >= 3) {
+            s_fallback_active = true;
+            tk_network_start_setup_ap();
+            tk_display_show_setup();
+        } else if (!s_fallback_active) {
+            tk_display_set_network_state(TK_DISPLAY_CONNECTING);
+            esp_wifi_connect();
+        }
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = data;
         snprintf(s_ip, sizeof(s_ip), IPSTR, IP2STR(&event->ip_info.ip));
         tk_display_set_ip(s_ip);
         xEventGroupSetBits(s_events, CONNECTED_BIT);
+        s_connect_attempts = 0; s_fallback_active = false;
         tk_display_set_network_state(TK_DISPLAY_CONNECTING);
         start_sntp_once();
         ESP_LOGI(TAG, "connected with IP %s", s_ip);
