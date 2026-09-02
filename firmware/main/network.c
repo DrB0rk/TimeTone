@@ -86,11 +86,16 @@ static void form_value(const char *body, const char *key, char *output, size_t o
 
 static esp_err_t save_handler(httpd_req_t *request)
 {
-    if (request->content_len <= 0 || request->content_len >= 700) return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, "Invalid form");
+    if (request->content_len <= 0 || request->content_len >= 1400) return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, "Invalid form");
     char *body = calloc(1, request->content_len + 1);
     if (!body) return ESP_ERR_NO_MEM;
-    int received = httpd_req_recv(request, body, request->content_len);
-    if (received <= 0) { free(body); return ESP_FAIL; }
+    size_t received = 0;
+    while (received < (size_t)request->content_len) {
+        int chunk = httpd_req_recv(request, body + received, request->content_len - received);
+        if (chunk <= 0) { free(body); return ESP_FAIL; }
+        received += (size_t)chunk;
+    }
+    body[received] = 0;
     tk_config_t config = *tk_config_get(); config.configured = true;
     form_value(body, "ssid", config.ssid, sizeof(config.ssid));
     char password[65]; form_value(body, "password", password, sizeof(password)); if (password[0]) strlcpy(config.wifi_password, password, sizeof(config.wifi_password));
