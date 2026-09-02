@@ -27,14 +27,12 @@ static volatile bool s_force_config;
 static TickType_t s_next_pair_attempt;
 static TickType_t s_next_config_attempt;
 static volatile bool s_clock_request_in_flight;
-// Keep one connection for interactive clock requests and one for the normal
-// API cadence.  Before this, heartbeat, config and event requests each opened
-// a fresh TLS session, which made a "sync" take several seconds on an ESP32
-// even while the server itself was already responding.
+// A colour code is the terminal's interactive path. Retain its HTTP client so
+// TLS is negotiated once rather than again for every employee. Background
+// calls stay one-shot: some reverse proxies close their idle HTTP/1.1 sockets,
+// and reusing those sockets can incorrectly trap a terminal in retry mode.
 static esp_http_client_handle_t s_clock_client;
-static esp_http_client_handle_t s_background_client;
 static char s_clock_client_server[160];
-static char s_background_client_server[160];
 static bool s_clock_connection_warmed;
 
 typedef struct { char *data; size_t length; size_t capacity; } response_buffer_t;
@@ -81,27 +79,19 @@ static int request(const char *path, esp_http_client_method_t method, const char
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
     // Settings may change the server URL from the terminal web UI. Dispose of
-    // the retained connections only in that case, then establish fresh ones.
+    // the retained interactive connection only in that case.
     if (s_clock_client && strcmp(s_clock_client_server, config->server_url) != 0) {
         esp_http_client_cleanup(s_clock_client);
         s_clock_client = NULL;
         s_clock_client_server[0] = 0;
         s_clock_connection_warmed = false;
     }
-    if (s_background_client && strcmp(s_background_client_server, config->server_url) != 0) {
-        esp_http_client_cleanup(s_background_client);
-        s_background_client = NULL;
-        s_background_client_server[0] = 0;
-    }
-    esp_http_client_handle_t client = is_clock ? s_clock_client : s_background_client;
+    esp_http_client_handle_t client = is_clock ? s_clock_client : NULL;
     if (!client) {
         client = esp_http_client_init(&client_config);
         if (is_clock && client) {
             s_clock_client = client;
             strlcpy(s_clock_client_server, config->server_url, sizeof(s_clock_client_server));
-        } else if (client) {
-            s_background_client = client;
-            strlcpy(s_background_client_server, config->server_url, sizeof(s_background_client_server));
         }
     }
     if (!client) return -1;
@@ -116,8 +106,6 @@ static int request(const char *path, esp_http_client_method_t method, const char
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_header(client, "Accept", "application/json");
     esp_http_client_set_header(client, "User-Agent", "TimeTone-Terminal/" TK_FIRMWARE_VERSION);
-    // Explicitly clear a previous POST body before a reused client performs a
-    // GET (for example heartbeat followed by the full configuration fetch).
     esp_http_client_set_post_field(client, body, body ? strlen(body) : 0);
     int64_t started_us = esp_timer_get_time();
     esp_err_t err = esp_http_client_perform(client);
@@ -129,9 +117,7 @@ static int request(const char *path, esp_http_client_method_t method, const char
     int64_t elapsed_ms = (esp_timer_get_time() - started_us) / 1000;
     if (err != ESP_OK) ESP_LOGW(TAG, "%s failed after %lldms: %s", path, elapsed_ms, esp_err_to_name(err));
     else if (strstr(path, "/clock") && elapsed_ms > 1000) ESP_LOGW(TAG, "slow clock request: %lldms", elapsed_ms);
-    // Both clients are intentionally retained. esp_http_client reconnects if
-    // the peer has closed an idle socket, while healthy connections avoid a
-    // DNS/TCP/TLS round trip on every sync.
+    if (!is_clock) esp_http_client_cleanup(client);
     return status;
 }
 

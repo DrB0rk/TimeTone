@@ -3,6 +3,10 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.25] - 2026-09-02
+
+- Restore one-shot background API connections after a stale reverse-proxy keep-alive socket could leave a terminal stuck retrying.
+
 ## [0.2.24] - 2026-09-02
 
 - Reuse retained HTTPS clients for the terminal's health, settings, and event syncs instead of opening a new TLS connection for every request.
