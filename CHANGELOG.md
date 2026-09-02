@@ -3,6 +3,12 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.10] - 2026-09-02
+
+- Remove browser USB firmware flashing from the dashboard.
+- Manage terminal firmware updates from the Devices page through explicit OTA requests.
+- Keep firmware downloads and installation terminal-controlled after an administrator starts an update.
+
 ## [0.2.9] - 2026-09-02
 
 - Fix native in-place updates to replace the compiled web bundle instead of serving stale UI assets.
