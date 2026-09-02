@@ -5,7 +5,8 @@
 
 #define TK_MAX_EMPLOYEES 32
 #define TK_MAX_EVENTS 48
-#define TK_FIRMWARE_VERSION "0.2.18"
+#define TK_MAX_CODE_REQUESTS 12
+#define TK_FIRMWARE_VERSION "0.2.20"
 
 typedef struct {
     char ssid[33];
@@ -46,9 +47,17 @@ typedef struct {
 } tk_event_t;
 
 typedef struct {
+    char id[48];
+    char code[5];
+} tk_code_request_t;
+
+typedef struct {
     uint32_t version;
     uint16_t employee_count;
     uint16_t event_count;
     tk_employee_t employees[TK_MAX_EMPLOYEES];
     tk_event_t events[TK_MAX_EVENTS];
+    // Appended to preserve the layout of the original persisted state.
+    uint16_t code_request_count;
+    tk_code_request_t code_requests[TK_MAX_CODE_REQUESTS];
 } tk_state_t;

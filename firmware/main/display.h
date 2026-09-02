@@ -20,4 +20,5 @@ void tk_display_show_ota(const char *version);
 void tk_display_finish_ota(bool success);
 void tk_display_apply_settings(void);
 void tk_display_set_company_name(const char *name);
+void tk_display_submission_status(const char *text, uint32_t color);
 bool tk_display_is_sleeping(void);

@@ -233,13 +233,13 @@ static void handle_keypress(const char *text)
     if (strlen(s_pin) < 4) {
         strlcat(s_pin, text, sizeof(s_pin));
         if (strlen(s_pin) == 4) {
-            char *code = strdup(s_pin);
+            esp_err_t queued = tk_api_queue_code(s_pin);
             s_pin[0] = 0;
-            s_entry_in_progress = true;
-            if (!code || xTaskCreate(code_submit_task, "code_submit", 8192, code, 3, NULL) != pdPASS) {
-                free(code); s_entry_in_progress = false; set_status("Could not send code - try again", 0xC47B24);
+            if (queued == ESP_OK) {
+                set_status("Saved - sending", 0x3D8BFD);
+                tk_api_poke();
             } else {
-                set_status("Checking code", 0xC47B24);
+                set_status(queued == ESP_ERR_NO_MEM ? "Queue full - try later" : "Could not save code", 0xC43D3D);
             }
         } else {
             char progress[40];
@@ -670,3 +670,11 @@ void tk_display_set_company_name(const char *name)
 }
 
 bool tk_display_is_sleeping(void) { return s_screen_sleeping; }
+
+void tk_display_submission_status(const char *text, uint32_t color)
+{
+    if (!s_status_label || !text) return;
+    _lock_acquire(&s_lvgl_lock);
+    set_status(text, color);
+    _lock_release(&s_lvgl_lock);
+}

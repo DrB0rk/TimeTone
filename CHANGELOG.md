@@ -3,6 +3,17 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.20] - 2026-09-02
+
+- Persist colour-code submissions before network delivery, provide immediate queue feedback, and retry safely after failures or restarts.
+- Deduplicate retried code submissions on the server with terminal-generated request IDs.
+- Re-warm the authenticated clock connection after terminal wake.
+
+## [0.2.19] - 2026-09-02
+
+- Keep a dedicated HTTPS connection warm for terminal clock submissions, avoiding a TLS handshake for each person.
+- Add an authenticated, side-effect-free clock-route warmup response.
+
 ## [0.2.18] - 2026-09-02
 
 - Remove full historical maintenance scans from the terminal's interactive clock endpoint.

@@ -10,6 +10,8 @@ void tk_state_unlock(void);
 esp_err_t tk_state_save(void);
 const tk_employee_t *tk_find_employee_by_code(const char *code);
 esp_err_t tk_toggle_employee(const char *employee_id, tk_event_t *created_event, bool *now_clocked_in);
+esp_err_t tk_queue_code_request(const char *code);
+bool tk_peek_code_request(tk_code_request_t *request);
+esp_err_t tk_pop_code_request(const char *id);
 void tk_format_utc(char output[25]);
 bool tk_time_is_valid(void);
-

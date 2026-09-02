@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "esp_check.h"
 #include "esp_random.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "psa/crypto.h"
@@ -164,6 +165,41 @@ esp_err_t tk_toggle_employee(const char *employee_id, tk_event_t *created_event,
     event->clock_in = employee->clocked_in;
     if (created_event) *created_event = *event;
     if (now_clocked_in) *now_clocked_in = employee->clocked_in;
+    esp_err_t err = tk_state_save();
+    tk_state_unlock();
+    return err;
+}
+
+esp_err_t tk_queue_code_request(const char *code)
+{
+    if (!code || strlen(code) != 4) return ESP_ERR_INVALID_ARG;
+    tk_state_t *state = tk_state_lock();
+    if (state->code_request_count >= TK_MAX_CODE_REQUESTS) { tk_state_unlock(); return ESP_ERR_NO_MEM; }
+    tk_code_request_t *request = &state->code_requests[state->code_request_count++];
+    memset(request, 0, sizeof(*request));
+    snprintf(request->id, sizeof(request->id), "%08lx-%lld", (unsigned long)esp_random(), (long long)esp_timer_get_time());
+    strlcpy(request->code, code, sizeof(request->code));
+    esp_err_t err = tk_state_save();
+    tk_state_unlock();
+    return err;
+}
+
+bool tk_peek_code_request(tk_code_request_t *request)
+{
+    if (!request) return false;
+    tk_state_t *state = tk_state_lock();
+    bool found = state->code_request_count > 0;
+    if (found) *request = state->code_requests[0];
+    tk_state_unlock();
+    return found;
+}
+
+esp_err_t tk_pop_code_request(const char *id)
+{
+    tk_state_t *state = tk_state_lock();
+    if (!state->code_request_count || !id || strcmp(state->code_requests[0].id, id) != 0) { tk_state_unlock(); return ESP_ERR_NOT_FOUND; }
+    memmove(state->code_requests, state->code_requests + 1, (state->code_request_count - 1) * sizeof(tk_code_request_t));
+    state->code_request_count--;
     esp_err_t err = tk_state_save();
     tk_state_unlock();
     return err;

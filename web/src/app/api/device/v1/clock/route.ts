@@ -10,13 +10,21 @@ import { publishLiveUpdate } from "@/lib/live-updates";
 
 export const dynamic = "force-dynamic";
 
-const schema = z.object({ code: z.string().regex(/^[ABCD]{4}$/) });
+const schema = z.union([
+  z.object({ code: z.string().regex(/^[ABCD]{4}$/), requestId: z.string().min(8).max(64).optional() }),
+  // The terminal establishes its TLS keep-alive connection while idle so the
+  // next employee does not pay a handshake cost at the keypad.
+  z.object({ warmup: z.literal(true) }),
+]);
 
 export async function POST(request: Request) {
   const device = authenticateDevice(request);
   if (!device) return unauthorized();
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ ok: false, error: "invalid_code" }, { status: 400 });
+  if ("warmup" in parsed.data) {
+    return Response.json({ ok: true, warmup: true }, { headers: { "Cache-Control": "no-store" } });
+  }
   const employee = db.prepare("SELECT id, name FROM employees WHERE code_digest = ? AND active = 1")
     .get(sha256(parsed.data.code)) as { id: string; name: string } | undefined;
   if (!employee) return Response.json({ ok: false, error: "invalid_code" }, { status: 404 });
@@ -49,6 +57,7 @@ export async function POST(request: Request) {
     employee.id,
     open ? "CLOCK_OUT" : "CLOCK_IN",
     now,
+    parsed.data.requestId,
   );
   db.prepare("UPDATE devices SET last_seen_at = ? WHERE id = ?").run(now, device.id);
   publishLiveUpdate("clock");
