@@ -9,7 +9,7 @@ if [ ! -f "$SCRIPT_DIR/web/package.json" ]; then
     TMP_DIR=$(mktemp -d)
     trap 'rm -rf "$TMP_DIR"' EXIT HUP INT TERM
     printf '%s\n' "Downloading the latest TimeTone release…"
-    curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/refs/heads/main" -o "$TMP_DIR/timetone.tar.gz"
+    curl -fsSL "https://codeload.github.com/DrB0rk/TimeTone/tar.gz/refs/heads/main?cachebust=$(date +%s)" -o "$TMP_DIR/timetone.tar.gz"
     mkdir -p "$TMP_DIR/source"
     tar -xzf "$TMP_DIR/timetone.tar.gz" -C "$TMP_DIR/source"
     SOURCE_DIR=$(find "$TMP_DIR/source" -mindepth 1 -maxdepth 1 -type d | head -n 1)
