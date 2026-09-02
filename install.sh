@@ -39,7 +39,7 @@ ask() {
   prompt=$1 default=$2
   if [ "$NON_INTERACTIVE" = true ]; then printf '%s' "$default"; return; fi
   printf '%s [%s]: ' "$prompt" "$default" >&2
-  IFS= read -r answer || true
+  if [ -r /dev/tty ]; then IFS= read -r answer </dev/tty || true; else IFS= read -r answer || true; fi
   printf '%s' "${answer:-$default}"
 }
 
@@ -70,7 +70,7 @@ fi
 
 if [ -f "$WEB_DIR/.env" ] && [ "$FORCE" = false ] && [ "$NON_INTERACTIVE" = false ]; then
   printf 'An existing web/.env was found. Replace it? [y/N]: ' >&2
-  IFS= read -r replace || true
+  if [ -r /dev/tty ]; then IFS= read -r replace </dev/tty || true; else IFS= read -r replace || true; fi
   case "$replace" in y|Y|yes|YES) ;; *)
     printf '%s\n' "Kept existing configuration. Starting TimeTone…"
     if [ "$MODE" = docker ]; then (cd "$WEB_DIR" && docker compose up -d --build)
@@ -85,7 +85,8 @@ if [ -z "$ADMIN_PASSWORD" ]; then
   [ "$NON_INTERACTIVE" = false ] || { printf '%s\n' "TIMETONE_ADMIN_PASSWORD is required with --non-interactive." >&2; exit 1; }
   while [ ${#ADMIN_PASSWORD} -lt 8 ]; do
     printf 'Create an admin password (at least 8 characters): ' >&2
-    stty -echo; IFS= read -r ADMIN_PASSWORD || true; stty echo; printf '\n' >&2
+    if [ -r /dev/tty ]; then stty -echo </dev/tty; IFS= read -r ADMIN_PASSWORD </dev/tty || true; stty echo </dev/tty; else stty -echo; IFS= read -r ADMIN_PASSWORD || true; stty echo; fi
+    printf '\n' >&2
     [ ${#ADMIN_PASSWORD} -ge 8 ] || printf '%s\n' "Please use at least 8 characters." >&2
   done
 fi
