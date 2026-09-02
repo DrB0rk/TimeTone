@@ -49,6 +49,9 @@ static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_cou
 static lv_obj_t *s_status_dot, *s_boot_label, *s_ota_label;
 static lv_obj_t *s_setup_details;
 static lv_obj_t *s_employee_status_list;
+// Do not place this on the LVGL task stack.  A complete employee cache is
+// nearly 6 KiB, while the UI task must also have room for LVGL itself.
+static tk_employee_t s_employee_status_cache[TK_MAX_EMPLOYEES];
 static char s_pin[9];
 static bool s_online;
 static tk_display_network_state_t s_network_state = TK_DISPLAY_OFFLINE;
@@ -388,11 +391,10 @@ static lv_obj_t *ui_text(lv_obj_t *parent, const char *text, uint32_t color, int
 static void refresh_employee_status_list(void)
 {
     if (!s_employee_status_list) return;
-    tk_employee_t employees[TK_MAX_EMPLOYEES];
     uint16_t count;
     tk_state_t *state = tk_state_lock();
     count = state->employee_count > TK_MAX_EMPLOYEES ? TK_MAX_EMPLOYEES : state->employee_count;
-    memcpy(employees, state->employees, count * sizeof(tk_employee_t));
+    memcpy(s_employee_status_cache, state->employees, count * sizeof(tk_employee_t));
     tk_state_unlock();
     lv_obj_clean(s_employee_status_list);
     if (!count) {
@@ -403,9 +405,9 @@ static void refresh_employee_status_list(void)
         int y = i * 38;
         lv_obj_t *row = ui_card(s_employee_status_list, 0, y, 194, 33, 0x26352C, 0x405249);
         lv_obj_t *dot = lv_obj_create(row); lv_obj_remove_style_all(dot); lv_obj_set_size(dot, 11, 11); lv_obj_set_pos(dot, 11, 11);
-        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(dot, lv_color_hex(employees[i].clocked_in ? 0x72D572 : 0x6F7C73), 0); lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
-        lv_obj_t *name = ui_text(row, employees[i].name, 0xF4F7F2, 30, 8); lv_obj_set_width(name, 101); lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
-        lv_obj_t *state_label = ui_text(row, employees[i].clocked_in ? "IN" : "OUT", employees[i].clocked_in ? 0x9FE4A7 : 0xB5C0B6, 0, 8);
+        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_bg_color(dot, lv_color_hex(s_employee_status_cache[i].clocked_in ? 0x72D572 : 0x6F7C73), 0); lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+        lv_obj_t *name = ui_text(row, s_employee_status_cache[i].name, 0xF4F7F2, 30, 8); lv_obj_set_width(name, 101); lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
+        lv_obj_t *state_label = ui_text(row, s_employee_status_cache[i].clocked_in ? "IN" : "OUT", s_employee_status_cache[i].clocked_in ? 0x9FE4A7 : 0xB5C0B6, 0, 8);
         lv_obj_set_width(state_label, 47); lv_obj_set_style_text_align(state_label, LV_TEXT_ALIGN_RIGHT, 0); lv_obj_set_pos(state_label, 138, 8);
     }
 }

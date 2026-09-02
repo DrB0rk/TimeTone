@@ -3,6 +3,10 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.23] - 2026-09-02
+
+- Fix a terminal restart when opening the team-status page by keeping its employee snapshot out of the LVGL task stack.
+
 ## [0.2.22] - 2026-09-02
 
 - Add a swipe-right employee status page to the terminal, with cached IN/OUT state, large coloured presence dots, scrolling, and a swipe-left return gesture.
