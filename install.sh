@@ -225,17 +225,23 @@ show_status() {
   HEALTH_URL="http://127.0.0.1:$PORT/api/health"
   HEALTH_OK=false
   HEALTH_BODY=""
-  attempt=1
-  while [ "$attempt" -le 15 ]; do
-    if HEALTH_BODY=$(curl -fsS "$HEALTH_URL" 2>/dev/null); then HEALTH_OK=true; break; fi
-    sleep 1
-    attempt=$((attempt + 1))
-  done
+  HEALTH_CURL_ERROR=""
   APP_VERSION=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$WEB_DIR/package.json" | head -n 1)
   [ -n "$APP_VERSION" ] || APP_VERSION=$(sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$/\1/p' "$ROOT_DIR/VERSION" | head -n 1)
   [ -n "$APP_VERSION" ] || APP_VERSION="unknown"
-  RUNTIME_VERSION=$(printf '%s' "$HEALTH_BODY" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-  [ -n "$RUNTIME_VERSION" ] || RUNTIME_VERSION="unknown"
+  RUNTIME_VERSION="unknown"
+  attempt=1
+  while [ "$attempt" -le 15 ]; do
+    if HEALTH_BODY=$(curl -fsS --max-time 5 "$HEALTH_URL" 2>/tmp/timetone-health-error); then
+      RUNTIME_VERSION=$(printf '%s' "$HEALTH_BODY" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+      [ -n "$RUNTIME_VERSION" ] || RUNTIME_VERSION="unknown"
+      if [ "$RUNTIME_VERSION" = "$APP_VERSION" ]; then HEALTH_OK=true; break; fi
+    else
+      HEALTH_CURL_ERROR=$(sed -n '1p' /tmp/timetone-health-error 2>/dev/null || true)
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
   if [ -f "$WEB_DIR/.next/standalone/server.js" ]; then BUNDLE_STATUS="prebuilt production bundle"; else BUNDLE_STATUS="locally built production bundle"; fi
   if [ "$MODE" = native ]; then
     DATA_PATH=$(sed -n 's/^DATABASE_PATH=//p' "$WEB_DIR/.env" | head -n 1)
@@ -260,7 +266,16 @@ show_status() {
     printf '  Running version: %s\n' "$RUNTIME_VERSION"
     printf '  URL: http://%s:%s\n' "${HOST_IP:-localhost}" "$PORT"
     printf '  Health endpoint: %s\n' "$HEALTH_URL"
-    if [ "$MODE" = native ]; then printf '  Check logs: %s/timetone.log\n' "$WEB_DIR"; else printf '  Check status: cd %s && docker compose ps\n' "$WEB_DIR"; fi
+    printf '  Health response: %s\n' "${HEALTH_BODY:-<no response>}"
+    [ -n "$HEALTH_CURL_ERROR" ] && printf '  Health error: %s\n' "$HEALTH_CURL_ERROR"
+    if [ "$MODE" = native ]; then
+      if [ -f "$WEB_DIR/timetone.pid" ]; then printf '  PID file: %s (state: %s)\n' "$(sed -n '1p' "$WEB_DIR/timetone.pid")" "$(ps -p "$(sed -n '1p' "$WEB_DIR/timetone.pid")" -o stat= 2>/dev/null || printf 'not running')"; else printf '  PID file: missing\n'; fi
+      if command -v ss >/dev/null 2>&1; then printf '  Port check: %s\n' "$(ss -ltnp 2>/dev/null | awk -v p=":$PORT" '$4 ~ p {print; found=1} END {if (!found) print "not listening"}')"; fi
+      printf '  Recent log output:\n'; tail -n 30 "$WEB_DIR/timetone.log" 2>/dev/null || printf '    <log unavailable>\n'
+    else
+      printf '  Container status:\n'; (cd "$WEB_DIR" && docker compose ps) 2>&1 || true
+      printf '  Recent container logs:\n'; (cd "$WEB_DIR" && docker compose logs --tail=30) 2>&1 || true
+    fi
     return 1
   fi
 }
