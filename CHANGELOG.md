@@ -3,6 +3,12 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.3] - 2026-09-02
+
+- Improve terminal connection status visibility with a persistent colored dot.
+- Apply local display, power, theme, and server settings without unnecessary restarts.
+- Add reliable save result handling and asynchronous color-code submission.
+
 ## [0.2.2] - 2026-09-02
 
 - Add animated OTA update progress screen on terminals.

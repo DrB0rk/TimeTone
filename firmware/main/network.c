@@ -102,7 +102,8 @@ static esp_err_t save_handler(httpd_req_t *request)
         received += (size_t)chunk;
     }
     body[received] = 0;
-    tk_config_t config = *tk_config_get(); config.configured = true;
+    tk_config_t previous = *tk_config_get();
+    tk_config_t config = previous; config.configured = true;
     form_value(body, "ssid", config.ssid, sizeof(config.ssid));
     char password[65]; form_value(body, "password", password, sizeof(password)); if (password[0]) strlcpy(config.wifi_password, password, sizeof(config.wifi_password));
     form_value(body, "server", config.server_url, sizeof(config.server_url));
@@ -129,10 +130,16 @@ static esp_err_t save_handler(httpd_req_t *request)
     if (save_err != ESP_OK) {
         return httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR, "Could not save settings to flash");
     }
+    bool restart_required = strcmp(previous.ssid, config.ssid) != 0 || strcmp(previous.wifi_password, config.wifi_password) != 0;
     httpd_resp_set_type(request, "text/html");
-    httpd_resp_sendstr(request, "<html><body style='font:18px system-ui;padding:40px'><h1>Saved</h1><p>The terminal is restarting...</p></body></html>");
-    vTaskDelay(pdMS_TO_TICKS(800));
-    esp_restart();
+    if (restart_required) {
+        httpd_resp_sendstr(request, "<html><head><meta http-equiv='refresh' content='3;url=/'></head><body style='font:18px system-ui;padding:40px'><h1>Saved</h1><p>Wi-Fi settings changed. Restarting terminal…</p></body></html>");
+        vTaskDelay(pdMS_TO_TICKS(800));
+        esp_restart();
+    } else {
+        tk_display_apply_settings();
+        httpd_resp_sendstr(request, "<html><head><meta http-equiv='refresh' content='2;url=/'></head><body style='font:18px system-ui;padding:40px'><h1>Saved</h1><p>Settings applied. Returning to configuration…</p></body></html>");
+    }
     return ESP_OK;
 }
 
