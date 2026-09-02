@@ -2,10 +2,10 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-# Pin the bootstrap payload so a stale CDN response for the moving `main`
-# branch cannot reinstall an older runtime. Bump this with each published
-# installer revision; callers may override it for a private fork.
-SOURCE_REF=${TIMETONE_SOURCE_REF:-86fbbfb}
+# Fetch the current main branch with a cache-busting query parameter below.
+# A fixed commit here becomes stale after the next release and can silently
+# roll an existing installation back; private forks can still override it.
+SOURCE_REF=${TIMETONE_SOURCE_REF:-main}
 
 stop_port_processes() {
   STOP_PORT=$1
