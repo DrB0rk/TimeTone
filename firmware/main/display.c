@@ -44,9 +44,9 @@ static const char *TAG = "display";
 
 static _lock_t s_lvgl_lock;
 static lv_display_t *s_display;
-static lv_obj_t *s_main_screen, *s_setup_screen, *s_settings_screen, *s_calibration_screen, *s_boot_screen, *s_header;
+static lv_obj_t *s_main_screen, *s_setup_screen, *s_settings_screen, *s_calibration_screen, *s_boot_screen, *s_ota_screen, *s_header;
 static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_count_label, *s_brand_label, *s_ip_label, *s_server_label;
-static lv_obj_t *s_sync_indicator, *s_boot_label;
+static lv_obj_t *s_sync_indicator, *s_boot_label, *s_ota_label;
 static lv_obj_t *s_setup_details;
 static char s_pin[9];
 static bool s_online;
@@ -54,6 +54,7 @@ static tk_display_network_state_t s_network_state = TK_DISPLAY_OFFLINE;
 static uint8_t s_sync_frame;
 static volatile bool s_entry_in_progress;
 static volatile bool s_starting;
+static volatile bool s_ota_visible;
 static bool s_calibrating, s_calibration_wait_release;
 static uint8_t s_calibration_step;
 static uint16_t s_calibration_x[4], s_calibration_y[4];
@@ -272,7 +273,10 @@ static void sync_animation_timer(lv_timer_t *timer)
     (void)timer;
     if (!s_sync_indicator) return;
     const char *frames[] = { "", ".", "..", "..." };
-    if (s_starting) {
+    if (s_ota_visible) {
+        char text[48]; snprintf(text, sizeof(text), "Installing update%s", frames[s_sync_frame++ % 4]);
+        lv_label_set_text(s_ota_label, text);
+    } else if (s_starting) {
         char text[48]; snprintf(text, sizeof(text), "Starting terminal%s", frames[s_sync_frame++ % 4]);
         lv_label_set_text(s_boot_label, text);
     } else if (s_entry_in_progress) {
@@ -399,6 +403,16 @@ static void build_boot_ui(void)
     lv_obj_t *hint = lv_label_create(s_boot_screen); lv_label_set_text(hint, "Connecting to Wi-Fi and server"); lv_obj_set_style_text_color(hint, lv_color_hex(0xA9B6A9), 0); lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0); lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -64);
 }
 
+static void build_ota_ui(void)
+{
+    s_ota_screen = lv_obj_create(lv_screen_active());
+    lv_obj_remove_style_all(s_ota_screen); lv_obj_set_size(s_ota_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_ota_screen, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_ota_screen, LV_OPA_COVER, 0); lv_obj_add_flag(s_ota_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_t *brand = lv_label_create(s_ota_screen); lv_label_set_text(brand, "TIMETONE"); lv_obj_set_style_text_color(brand, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(brand, &lv_font_montserrat_14, 0); lv_obj_align(brand, LV_ALIGN_TOP_MID, 0, 76);
+    lv_obj_t *title = lv_label_create(s_ota_screen); lv_label_set_text(title, "Terminal update"); lv_obj_set_style_text_color(title, lv_color_white(), 0); lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0); lv_obj_align(title, LV_ALIGN_CENTER, 0, -24);
+    s_ota_label = lv_label_create(s_ota_screen); lv_label_set_text(s_ota_label, "Preparing update"); lv_obj_set_style_text_color(s_ota_label, lv_color_hex(0xC8D0C9), 0); lv_obj_set_style_text_font(s_ota_label, &lv_font_montserrat_14, 0); lv_obj_align(s_ota_label, LV_ALIGN_CENTER, 0, 12);
+    lv_obj_t *hint = lv_label_create(s_ota_screen); lv_label_set_text(hint, "Do not disconnect power"); lv_obj_set_style_text_color(hint, lv_color_hex(0xA9B6A9), 0); lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0); lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -64);
+}
+
 static void build_settings_ui(void)
 {
     s_settings_screen = lv_obj_create(lv_screen_active());
@@ -469,7 +483,7 @@ esp_err_t tk_display_init(void)
     lv_indev_t *indev = lv_indev_create(); lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); lv_indev_set_display(indev, s_display); lv_indev_set_user_data(indev, touch); lv_indev_set_read_cb(indev, touch_cb);
     const esp_timer_create_args_t tick_args = { .callback = tick_cb, .name = "lvgl_tick" };
     esp_timer_handle_t timer; ESP_ERROR_CHECK(esp_timer_create(&tick_args, &timer)); ESP_ERROR_CHECK(esp_timer_start_periodic(timer, 2000));
-    build_clock_ui(); build_setup_ui(); build_settings_ui(); build_calibration_ui(); build_boot_ui(); tk_display_refresh();
+    build_clock_ui(); build_setup_ui(); build_settings_ui(); build_calibration_ui(); build_boot_ui(); build_ota_ui(); tk_display_refresh();
     char current_ip[16]; tk_network_ip(current_ip, sizeof(current_ip)); tk_display_set_ip(current_ip);
     if (s_server_label) lv_label_set_text_fmt(s_server_label, "Server: %s", tk_config_get()->server_url[0] ? tk_config_get()->server_url : "not configured");
     xTaskCreate(lvgl_task, "lvgl", 6144, NULL, 5, NULL);
@@ -538,6 +552,21 @@ void tk_display_show_startup(void)
     _lock_acquire(&s_lvgl_lock); s_starting = true;
     lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_boot_screen, LV_OBJ_FLAG_HIDDEN);
     _lock_release(&s_lvgl_lock);
+}
+
+void tk_display_show_ota(const char *version)
+{
+    if (!s_ota_screen) return;
+    _lock_acquire(&s_lvgl_lock); s_ota_visible = true; s_starting = false;
+    lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_boot_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_ota_screen, LV_OBJ_FLAG_HIDDEN);
+    if (version && version[0]) { char text[48]; snprintf(text, sizeof(text), "Preparing %s", version); lv_label_set_text(s_ota_label, text); }
+    _lock_release(&s_lvgl_lock);
+}
+
+void tk_display_finish_ota(bool success)
+{
+    if (!s_ota_screen) return;
+    _lock_acquire(&s_lvgl_lock); s_ota_visible = false; lv_obj_add_flag(s_ota_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); set_status(success ? "Update complete" : "Update failed - try again", success ? 0x168455 : 0xC43D3D); _lock_release(&s_lvgl_lock);
 }
 
 static void apply_theme_styles(void)

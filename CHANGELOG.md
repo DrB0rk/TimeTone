@@ -3,6 +3,10 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.2] - 2026-09-02
+
+- Add animated OTA update progress screen on terminals.
+
 ## [0.2.1] - 2026-09-02
 
 - Add animated connecting and syncing state feedback on terminals.

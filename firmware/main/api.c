@@ -137,6 +137,7 @@ static esp_err_t fetch_config(void)
             char *ota_url = strdup(url->valuestring);
             if (ota_url) {
                 s_ota_in_progress = true;
+                tk_display_show_ota(version->valuestring);
                 xTaskCreate(ota_task, "timekeep_ota", 8192, ota_url, 5, NULL);
             }
         }
@@ -165,6 +166,7 @@ static void ota_task(void *argument)
     }
     ESP_LOGE(TAG, "OTA update failed: %s", esp_err_to_name(err));
     s_ota_in_progress = false;
+    tk_display_finish_ota(false);
     vTaskDelete(NULL);
 }
 
