@@ -19,13 +19,10 @@
 
 static const char *TAG = "api";
 static SemaphoreHandle_t s_wake;
-static uint16_t s_sync_interval_seconds = 5;
 static bool s_ota_in_progress;
-static uint8_t s_sync_failures;
-static uint32_t s_config_elapsed;
 static volatile bool s_force_config;
+static volatile bool s_code_requested;
 static TickType_t s_next_pair_attempt;
-static TickType_t s_next_config_attempt;
 static volatile bool s_clock_request_in_flight;
 // A colour code is the terminal's interactive path. Retain its HTTP client so
 // TLS is negotiated once rather than again for every employee. Background
@@ -161,7 +158,6 @@ static esp_err_t fetch_config(void)
         bool changed = false;
         if (cJSON_IsNumber(interval)) {
             uint16_t seconds = (uint16_t)(interval->valuedouble < 2 ? 2 : interval->valuedouble > 60 ? 60 : interval->valuedouble);
-            s_sync_interval_seconds = seconds;
             if (updated.sync_interval_seconds != seconds) { updated.sync_interval_seconds = seconds; changed = true; }
         }
         if (cJSON_IsNumber(full_interval)) {
@@ -368,88 +364,36 @@ static int heartbeat(void)
 
 static void api_task(void *argument)
 {
-    // Do a config fetch as soon as the first authenticated heartbeat succeeds.
-    // This is deliberately after—not before—the health check so startup stays
-    // responsive when the server is offline or the device is awaiting approval.
-    bool first_sync = true;
     while (true) {
-        uint16_t base_seconds = tk_config_get()->sync_interval_seconds ?: s_sync_interval_seconds;
-        uint16_t full_sync_seconds = tk_config_get()->full_sync_interval_seconds ?: 300;
-        bool config_due = (first_sync || s_force_config || s_config_elapsed >= full_sync_seconds) &&
-            xTaskGetTickCount() >= s_next_config_attempt;
-        if (tk_network_connected() && tk_config_get()->configured && !tk_display_is_sleeping() && !s_clock_request_in_flight) {
-            // A warmed clock connection is the normal case, so deliver a
-            // scan immediately. After wake or boot, first let heartbeat()
-            // establish both background and clock TLS sessions; sending the
-            // first scan through a cold connection was the source of the
-            // multi-second "checking" delay.
-            bool clock_was_warm = s_clock_connection_warmed;
-            if (clock_was_warm) {
-                esp_err_t code_result = push_code_requests();
-                if (code_result == ESP_FAIL) {
-                    if (s_sync_failures < 5) s_sync_failures++;
-                    tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING);
-                }
-            }
-            // The short interval is a genuine health check. Do not start a
-            // full download or event upload until authentication is known to
-            // be valid, which avoids long timeouts and misleading status loops.
+        xSemaphoreTake(s_wake, portMAX_DELAY);
+        bool refresh_requested = s_force_config;
+        bool code_requested = s_code_requested;
+        s_force_config = false;
+        s_code_requested = false;
+        if (!tk_network_connected() || !tk_config_get()->configured || tk_display_is_sleeping() || s_clock_request_in_flight) {
+            if (refresh_requested) tk_display_set_network_state(TK_DISPLAY_CONNECTING);
+            if (code_requested) tk_display_submission_status("Saved - retry when online", 0xC47B24);
+            continue;
+        }
+        // Configuration is intentionally event-driven: once at boot and when
+        // the user explicitly taps Sync Now. There is no timed polling.
+        if (refresh_requested) {
             int health_status = heartbeat();
             if (health_status == 200) {
-                s_sync_failures = 0;
-                // heartbeat() warms the retained clock client when needed.
-                // Submit any scan that arrived during wake-up only after that
-                // warm-up, so its request can reuse the established session.
-                if (!clock_was_warm) {
-                    esp_err_t code_result = push_code_requests();
-                    if (code_result == ESP_FAIL) {
-                        if (s_sync_failures < 5) s_sync_failures++;
-                        tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING);
-                    }
-                }
-                if (config_due) {
-                    tk_display_set_network_state(TK_DISPLAY_SYNCING);
-                    esp_err_t config_result = fetch_config();
-                    if (config_result == ESP_OK) {
-                        s_config_elapsed = 0;
-                        first_sync = false;
-                        s_force_config = false;
-                        s_next_config_attempt = 0;
-                    } else {
-                        // Keep the previous working employee cache and retry
-                        // configuration soon, without declaring the server
-                        // offline when its health endpoint remains reachable.
-                        // Throttle a broken config route to one attempt per
-                        // 30 seconds; the separate heartbeat remains fast.
-                        s_next_config_attempt = xTaskGetTickCount() + pdMS_TO_TICKS(30000);
-                        s_force_config = false;
-                        s_config_elapsed = full_sync_seconds;
-                        ESP_LOGW(TAG, "configuration sync failed; retaining local cache and retrying in 30s");
-                    }
-                }
-                if (push_events() != ESP_OK) ESP_LOGW(TAG, "queued event upload failed; will retry");
+                tk_display_set_network_state(TK_DISPLAY_SYNCING);
+                if (fetch_config() != ESP_OK) ESP_LOGW(TAG, "manual configuration sync failed; retaining local cache");
+                if (push_events() != ESP_OK) ESP_LOGW(TAG, "queued event upload failed; retry on the next action");
                 tk_display_set_network_state(TK_DISPLAY_ONLINE);
-            } else if (health_status == 401) {
-                // A device awaiting dashboard approval is not a Wi-Fi failure.
-                // Keep it discoverable and retry at a calm fixed cadence.
-                tk_display_set_network_state(TK_DISPLAY_CONNECTING);
             } else {
-                if (s_sync_failures < 5) s_sync_failures++;
-                tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING);
+                tk_display_set_network_state(health_status == 401 ? TK_DISPLAY_CONNECTING : TK_DISPLAY_SYNC_RETRYING);
             }
         }
-        uint16_t seconds = base_seconds;
-        if (s_sync_failures) {
-            uint16_t multiplier = 1u << (s_sync_failures > 4 ? 4 : s_sync_failures);
-            seconds = seconds > (60 / multiplier) ? 60 : seconds * multiplier;
+        // A colour-code entry is the only routine server request after setup.
+        if (code_requested) {
+            esp_err_t code_result = push_code_requests();
+            if (code_result == ESP_OK) tk_display_set_network_state(TK_DISPLAY_ONLINE);
+            else if (code_result != ESP_ERR_NOT_FOUND) tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING);
         }
-        // Pending approval should remain responsive without hammering pair.
-        if (tk_network_connected() && tk_config_get()->configured && s_sync_failures == 0 && xTaskGetTickCount() < s_next_pair_attempt) seconds = seconds < 10 ? 10 : seconds;
-        uint32_t before = xTaskGetTickCount() / configTICK_RATE_HZ;
-        bool woken = xSemaphoreTake(s_wake, pdMS_TO_TICKS(seconds * 1000)) == pdTRUE;
-        uint32_t after = xTaskGetTickCount() / configTICK_RATE_HZ;
-        uint32_t elapsed = woken ? (after - before) : seconds;
-        s_config_elapsed += elapsed;
     }
 }
 
@@ -457,8 +401,12 @@ esp_err_t tk_api_start(void)
 {
     s_wake = xSemaphoreCreateBinary();
     if (!s_wake) return ESP_ERR_NO_MEM;
-    return xTaskCreate(api_task, "timekeep_api", 8192, NULL, 4, NULL) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+    if (xTaskCreate(api_task, "timekeep_api", 8192, NULL, 4, NULL) != pdPASS) return ESP_ERR_NO_MEM;
+    s_force_config = true;
+    xSemaphoreGive(s_wake);
+    return ESP_OK;
 }
 
-void tk_api_wake(void) { s_clock_connection_warmed = false; s_force_config = true; s_next_config_attempt = 0; if (s_wake) xSemaphoreGive(s_wake); }
-void tk_api_poke(void) { if (s_wake) xSemaphoreGive(s_wake); }
+void tk_api_wake(void) { s_clock_connection_warmed = false; s_force_config = true; if (s_wake) xSemaphoreGive(s_wake); }
+void tk_api_resume(void) { s_clock_connection_warmed = false; }
+void tk_api_poke(void) { s_code_requested = true; if (s_wake) xSemaphoreGive(s_wake); }

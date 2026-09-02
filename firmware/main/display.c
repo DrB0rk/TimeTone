@@ -95,7 +95,7 @@ static void set_screen_sleeping(bool sleeping)
     s_screen_sleeping = sleeping;
     if (sleeping) set_screen_off(true);
     tk_network_set_low_power(sleeping);
-    if (!sleeping) tk_api_wake();
+    if (!sleeping) tk_api_resume();
 }
 
 static void register_activity(void)

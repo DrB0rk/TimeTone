@@ -3,6 +3,7 @@
 
 esp_err_t tk_api_start(void);
 void tk_api_wake(void);
+void tk_api_resume(void);
 void tk_api_poke(void);
 esp_err_t tk_api_queue_code(const char *code);
 esp_err_t tk_api_submit_code(const char *code, char employee_name[48], bool *clocked_in);

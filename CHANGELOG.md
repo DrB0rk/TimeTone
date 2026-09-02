@@ -3,6 +3,10 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.26] - 2026-09-02
+
+- Make terminal server traffic event-driven: no periodic health checks or full configuration downloads after setup; code entries contact the server immediately, and settings refresh only at boot or when manually requested.
+
 ## [0.2.25] - 2026-09-02
 
 - Restore one-shot background API connections after a stale reverse-proxy keep-alive socket could leave a terminal stuck retrying.
