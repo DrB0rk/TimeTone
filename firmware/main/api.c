@@ -22,7 +22,6 @@ static uint16_t s_sync_interval_seconds = 5;
 static bool s_ota_in_progress;
 static uint8_t s_sync_failures;
 static uint32_t s_config_elapsed;
-static uint32_t s_heartbeat_elapsed;
 
 typedef struct { char *data; size_t length; size_t capacity; } response_buffer_t;
 static void ota_task(void *argument);
@@ -269,7 +268,9 @@ static void api_task(void *argument)
                 first_sync = false;
             }
             push_events();
-            if (s_heartbeat_elapsed >= 15 || config_due) { heartbeat(); s_heartbeat_elapsed = 0; }
+            // The short interval is a real health check: keep the terminal's
+            // online status fresh without downloading the full configuration.
+            heartbeat();
             if (config_due) {
                 if (config_result == ESP_OK) { s_sync_failures = 0; tk_display_set_network_state(TK_DISPLAY_ONLINE); }
                 else { if (s_sync_failures < 5) s_sync_failures++; tk_display_set_network_state(TK_DISPLAY_SYNC_RETRYING); }
@@ -284,7 +285,7 @@ static void api_task(void *argument)
         bool woken = xSemaphoreTake(s_wake, pdMS_TO_TICKS(seconds * 1000)) == pdTRUE;
         uint32_t after = xTaskGetTickCount() / configTICK_RATE_HZ;
         uint32_t elapsed = woken ? (after - before) : seconds;
-        s_config_elapsed += elapsed; s_heartbeat_elapsed += elapsed;
+        s_config_elapsed += elapsed;
     }
 }
 
