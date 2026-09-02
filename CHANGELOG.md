@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.15] - 2026-09-02
+
+- Modernize the terminal home, startup, offline setup, settings, and local browser-configuration experiences.
+- Introduce a cohesive card system, refined status hierarchy, and better touch-target spacing for the CYD portrait display.
+
 ## [0.2.14] - 2026-09-02
 
 - Replace the custom-drawn terminal settings cog with LVGL's bundled Font Awesome settings icon.

@@ -355,16 +355,35 @@ static void open_settings_event(lv_event_t *event)
     s_calibrating = false;
 }
 
+static lv_obj_t *ui_card(lv_obj_t *parent, int x, int y, int width, int height, uint32_t color, uint32_t border)
+{
+    lv_obj_t *card = lv_obj_create(parent);
+    lv_obj_remove_style_all(card); lv_obj_set_size(card, width, height); lv_obj_set_pos(card, x, y);
+    lv_obj_set_style_bg_color(card, lv_color_hex(color), 0); lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(card, 14, 0); lv_obj_set_style_border_width(card, 1, 0); lv_obj_set_style_border_color(card, lv_color_hex(border), 0);
+    return card;
+}
+
+static lv_obj_t *ui_text(lv_obj_t *parent, const char *text, uint32_t color, int x, int y)
+{
+    lv_obj_t *label = lv_label_create(parent); lv_label_set_text(label, text);
+    lv_obj_set_style_text_color(label, lv_color_hex(color), 0); lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0); lv_obj_set_pos(label, x, y);
+    return label;
+}
+
 static void build_clock_ui(void)
 {
     s_main_screen = lv_obj_create(lv_screen_active());
     lv_obj_remove_style_all(s_main_screen); lv_obj_set_size(s_main_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_main_screen, lv_color_hex(bg_color()), 0); lv_obj_set_style_bg_opa(s_main_screen, LV_OPA_COVER, 0);
     s_header = lv_obj_create(s_main_screen);
-    lv_obj_remove_style_all(s_header); lv_obj_set_size(s_header, H_RES, 46); lv_obj_set_style_bg_color(s_header, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_header, LV_OPA_COVER, 0);
-    s_brand_label = lv_label_create(s_header); lv_label_set_text(s_brand_label, "TIMETONE"); lv_label_set_long_mode(s_brand_label, LV_LABEL_LONG_DOT); lv_obj_set_width(s_brand_label, 112); lv_obj_set_style_text_color(s_brand_label, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_brand_label, &lv_font_montserrat_14, 0); lv_obj_align(s_brand_label, LV_ALIGN_LEFT_MID, 14, 0);
+    lv_obj_remove_style_all(s_header); lv_obj_set_size(s_header, H_RES, 52); lv_obj_set_style_bg_color(s_header, lv_color_hex(0x101813), 0); lv_obj_set_style_bg_opa(s_header, LV_OPA_COVER, 0);
+    lv_obj_t *brand_mark = ui_card(s_header, 12, 13, 26, 26, 0xD8FF62, 0xD8FF62);
+    lv_obj_t *mark_text = ui_text(brand_mark, "T", 0x17211B, 8, 5);
+    (void)mark_text;
+    s_brand_label = lv_label_create(s_header); lv_label_set_text(s_brand_label, "TIMETONE"); lv_label_set_long_mode(s_brand_label, LV_LABEL_LONG_DOT); lv_obj_set_width(s_brand_label, 76); lv_obj_set_style_text_color(s_brand_label, lv_color_hex(0xF4F7F2), 0); lv_obj_set_style_text_font(s_brand_label, &lv_font_montserrat_14, 0); lv_obj_align(s_brand_label, LV_ALIGN_LEFT_MID, 46, 0);
     s_clock_label = lv_label_create(s_header); lv_obj_set_style_text_color(s_clock_label, lv_color_white(), 0); lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0); lv_obj_align(s_clock_label, LV_ALIGN_CENTER, 0, 0);
-    s_status_dot = lv_led_create(s_header); lv_obj_set_size(s_status_dot, 12, 12); lv_obj_set_style_radius(s_status_dot, LV_RADIUS_CIRCLE, 0); lv_led_set_color(s_status_dot, lv_color_hex(0x788078)); lv_led_on(s_status_dot); lv_obj_align(s_status_dot, LV_ALIGN_RIGHT_MID, -58, 0);
-    lv_obj_t *settings = lv_button_create(s_header); lv_obj_set_size(settings, 38, 32); lv_obj_align(settings, LV_ALIGN_RIGHT_MID, -8, 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x2D3D33), 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x405249), LV_STATE_PRESSED); lv_obj_set_style_radius(settings, 10, 0); lv_obj_set_style_border_width(settings, 1, 0); lv_obj_set_style_border_color(settings, lv_color_hex(0x52665A), 0); lv_obj_add_event_cb(settings, open_settings_event, LV_EVENT_CLICKED, NULL);
+    s_status_dot = lv_led_create(s_header); lv_obj_set_size(s_status_dot, 10, 10); lv_obj_set_style_radius(s_status_dot, LV_RADIUS_CIRCLE, 0); lv_led_set_color(s_status_dot, lv_color_hex(0x788078)); lv_led_on(s_status_dot); lv_obj_align(s_status_dot, LV_ALIGN_RIGHT_MID, -56, 0);
+    lv_obj_t *settings = lv_button_create(s_header); lv_obj_set_size(settings, 36, 34); lv_obj_align(settings, LV_ALIGN_RIGHT_MID, -8, 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x26352C), 0); lv_obj_set_style_bg_color(settings, lv_color_hex(0x405249), LV_STATE_PRESSED); lv_obj_set_style_radius(settings, 12, 0); lv_obj_set_style_border_width(settings, 1, 0); lv_obj_set_style_border_color(settings, lv_color_hex(0x405249), 0); lv_obj_add_event_cb(settings, open_settings_event, LV_EVENT_CLICKED, NULL);
     // LVGL ships this Font Awesome settings glyph with Montserrat 14.  Using
     // the bundled icon font is more reliable than composing a cog from child
     // objects (which caused rendering artefacts on the CYD display driver).
@@ -374,10 +393,11 @@ static void build_clock_ui(void)
     lv_obj_set_style_text_color(settings_icon, lv_color_hex(0xD8FF62), 0);
     lv_obj_center(settings_icon);
     lv_obj_clear_flag(settings_icon, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_t *prompt = lv_label_create(s_main_screen); lv_label_set_text(prompt, "Clock in or out"); lv_obj_set_style_text_font(prompt, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(prompt, lv_color_hex(fg_color()), 0); lv_obj_set_pos(prompt, 14, 55);
-    s_pin_label = lv_label_create(s_main_screen); lv_obj_set_size(s_pin_label, 212, 38); lv_obj_set_style_bg_color(s_pin_label, lv_color_white(), 0); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_COVER, 0); lv_obj_set_style_border_width(s_pin_label, 1, 0); lv_obj_set_style_border_color(s_pin_label, lv_color_hex(0xD4D8D1), 0); lv_obj_set_style_radius(s_pin_label, 10, 0); lv_obj_set_style_pad_left(s_pin_label, 12, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 14, 78);
-    s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 30); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_WRAP); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 120);
-    s_keypad = lv_obj_create(s_main_screen); lv_obj_remove_style_all(s_keypad); lv_obj_set_size(s_keypad, 212, 112); lv_obj_set_pos(s_keypad, 14, 149);
+    ui_text(s_main_screen, "TIME TERMINAL", 0x93A39A, 14, 66);
+    lv_obj_t *entry_card = ui_card(s_main_screen, 14, 86, 212, 52, dark_theme() ? 0x26352C : 0xFFFFFF, dark_theme() ? 0x405249 : 0xD4D8D1);
+    s_pin_label = lv_label_create(entry_card); lv_obj_set_size(s_pin_label, 188, 32); lv_obj_set_style_bg_opa(s_pin_label, LV_OPA_TRANSP, 0); lv_obj_set_style_border_width(s_pin_label, 0, 0); lv_obj_set_style_pad_left(s_pin_label, 0, 0); lv_obj_set_style_pad_top(s_pin_label, 9, 0); lv_obj_set_style_text_font(s_pin_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_pin_label, 12, 2);
+    s_status_label = lv_label_create(s_main_screen); lv_obj_set_size(s_status_label, 212, 26); lv_label_set_long_mode(s_status_label, LV_LABEL_LONG_DOT); lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_status_label, 14, 145);
+    s_keypad = lv_obj_create(s_main_screen); lv_obj_remove_style_all(s_keypad); lv_obj_set_size(s_keypad, 212, 104); lv_obj_set_pos(s_keypad, 14, 174);
     // Keep this row-major order in sync with the web color picker:
     // top-left Coral (A), top-right Ocean (B), bottom-left Lime (C),
     // bottom-right Violet (D).
@@ -385,16 +405,16 @@ static void build_clock_ui(void)
     static const uint32_t colors[] = { 0xEF6F61, 0x3D8BFD, 0x9ACB3C, 0x9B72CF };
     for (int i = 0; i < 4; ++i) {
         lv_obj_t *button = lv_button_create(s_keypad);
-        lv_obj_set_size(button, 104, 54); lv_obj_set_pos(button, (i % 2) * 108, (i / 2) * 58);
-        lv_obj_set_style_bg_color(button, lv_color_hex(colors[i]), 0); lv_obj_set_style_bg_color(button, lv_color_hex(0xFFFFFF), LV_STATE_PRESSED); lv_obj_set_style_text_color(button, lv_color_hex(0x17211B), 0); lv_obj_set_style_text_font(button, &lv_font_montserrat_14, 0); lv_obj_set_style_radius(button, 12, 0); lv_obj_set_style_border_width(button, 1, 0); lv_obj_set_style_border_color(button, lv_color_hex(0xC8CEC7), 0); lv_obj_set_style_shadow_width(button, 3, 0); lv_obj_set_style_shadow_opa(button, LV_OPA_20, 0); lv_obj_add_event_cb(button, keypad_button_event, LV_EVENT_CLICKED, (void *)keys[i]);
+        lv_obj_set_size(button, 104, 50); lv_obj_set_pos(button, (i % 2) * 108, (i / 2) * 54);
+        lv_obj_set_style_bg_color(button, lv_color_hex(colors[i]), 0); lv_obj_set_style_bg_color(button, lv_color_hex(0xFFFFFF), LV_STATE_PRESSED); lv_obj_set_style_radius(button, 14, 0); lv_obj_set_style_border_width(button, 0, 0); lv_obj_set_style_shadow_width(button, 5, 0); lv_obj_set_style_shadow_color(button, lv_color_hex(0x101813), 0); lv_obj_set_style_shadow_opa(button, LV_OPA_30, 0); lv_obj_add_event_cb(button, keypad_button_event, LV_EVENT_CLICKED, (void *)keys[i]);
     }
     lv_obj_t *clear = lv_button_create(s_main_screen);
-    lv_obj_set_size(clear, 212, 30); lv_obj_set_pos(clear, 14, 266);
-    lv_obj_set_style_bg_color(clear, lv_color_hex(0x34443A), 0); lv_obj_set_style_bg_color(clear, lv_color_hex(0xD8FF62), LV_STATE_PRESSED);
-    lv_obj_set_style_text_color(clear, lv_color_white(), 0); lv_obj_set_style_text_font(clear, &lv_font_montserrat_14, 0); lv_obj_set_style_radius(clear, 9, 0); lv_obj_set_style_border_width(clear, 0, 0);
+    lv_obj_set_size(clear, 212, 28); lv_obj_set_pos(clear, 14, 278);
+    lv_obj_set_style_bg_color(clear, lv_color_hex(0x26352C), 0); lv_obj_set_style_bg_color(clear, lv_color_hex(0x405249), LV_STATE_PRESSED);
+    lv_obj_set_style_text_color(clear, lv_color_hex(0xD3DED4), 0); lv_obj_set_style_text_font(clear, &lv_font_montserrat_14, 0); lv_obj_set_style_radius(clear, 10, 0); lv_obj_set_style_border_width(clear, 1, 0); lv_obj_set_style_border_color(clear, lv_color_hex(0x405249), 0);
     lv_obj_add_event_cb(clear, clear_keypad_event, LV_EVENT_CLICKED, NULL);
     lv_obj_t *clear_label = lv_label_create(clear); lv_label_set_text(clear_label, "CLEAR"); lv_obj_center(clear_label);
-    s_count_label = lv_label_create(s_main_screen); lv_obj_set_style_text_color(s_count_label, lv_color_hex(0x788078), 0); lv_obj_set_style_text_font(s_count_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_count_label, 14, 304);
+    s_count_label = lv_label_create(s_main_screen); lv_obj_set_style_text_color(s_count_label, lv_color_hex(0x788078), 0); lv_obj_set_style_text_font(s_count_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_count_label, 14, 307);
     set_status("Ready", 0x168455); update_pin_label();
     lv_timer_create(clock_timer, 1000, NULL); clock_timer(NULL);
     lv_timer_create(sync_animation_timer, 420, NULL);
@@ -404,23 +424,29 @@ static void build_setup_ui(void)
 {
     s_setup_screen = lv_obj_create(lv_screen_active());
     lv_obj_remove_style_all(s_setup_screen); lv_obj_set_size(s_setup_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_setup_screen, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_setup_screen, LV_OPA_COVER, 0); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_t *eyebrow = lv_label_create(s_setup_screen); lv_label_set_text(eyebrow, "TIMETONE  -  OFFLINE"); lv_obj_set_style_text_color(eyebrow, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(eyebrow, &lv_font_montserrat_14, 0); lv_obj_set_pos(eyebrow, 18, 24);
-    lv_obj_t *title = lv_label_create(s_setup_screen); lv_label_set_text(title, "NO NETWORK"); lv_obj_set_style_text_color(title, lv_color_white(), 0); lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0); lv_obj_set_pos(title, 18, 58);
-    lv_obj_t *message = lv_label_create(s_setup_screen); lv_label_set_text(message, "Connect to this access point\nto configure the terminal."); lv_obj_set_style_text_color(message, lv_color_hex(0xC8D0C9), 0); lv_obj_set_style_text_font(message, &lv_font_montserrat_14, 0); lv_obj_set_pos(message, 18, 100);
-    lv_obj_t *card = lv_obj_create(s_setup_screen); lv_obj_remove_style_all(card); lv_obj_set_size(card, 204, 122); lv_obj_set_pos(card, 18, 158); lv_obj_set_style_bg_color(card, lv_color_hex(0x26352C), 0); lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0); lv_obj_set_style_radius(card, 12, 0); lv_obj_set_style_pad_all(card, 14, 0);
-    lv_obj_t *details = lv_label_create(card); lv_label_set_text(details, "SETUP WI-FI"); lv_obj_set_style_text_color(details, lv_color_hex(0xA9B6A9), 0); lv_obj_set_style_text_font(details, &lv_font_montserrat_14, 0); lv_obj_set_pos(details, 14, 12);
-    s_setup_details = lv_label_create(card); lv_obj_set_style_text_color(s_setup_details, lv_color_white(), 0); lv_obj_set_style_text_font(s_setup_details, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_setup_details, 14, 38);
-    lv_obj_t *hint = lv_label_create(s_setup_screen); lv_label_set_text(hint, "Open 192.168.4.1 in your browser"); lv_obj_set_style_text_color(hint, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0); lv_obj_set_pos(hint, 18, 300);
+    ui_card(s_setup_screen, 14, 18, 212, 42, 0x26352C, 0x405249);
+    ui_text(s_setup_screen, "TIMETONE", 0xD8FF62, 28, 30);
+    ui_text(s_setup_screen, "SETUP MODE", 0xA9B6A9, 122, 30);
+    ui_text(s_setup_screen, "Let's get this terminal online", 0xF4F7F2, 18, 84);
+    ui_text(s_setup_screen, "No Wi-Fi connection was found.\nUse the temporary network below.", 0xB9C6BC, 18, 112);
+    lv_obj_t *card = ui_card(s_setup_screen, 14, 164, 212, 86, 0x26352C, 0x52665A);
+    ui_text(card, "CONNECT TO WI-FI", 0x93A39A, 14, 12);
+    s_setup_details = ui_text(card, "", 0xF4F7F2, 14, 38);
+    lv_obj_t *open_card = ui_card(s_setup_screen, 14, 264, 212, 38, 0xD8FF62, 0xD8FF62);
+    ui_text(open_card, "Then open  192.168.4.1", 0x17211B, 14, 10);
 }
 
 static void build_boot_ui(void)
 {
     s_boot_screen = lv_obj_create(lv_screen_active());
     lv_obj_remove_style_all(s_boot_screen); lv_obj_set_size(s_boot_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_boot_screen, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_boot_screen, LV_OPA_COVER, 0); lv_obj_add_flag(s_boot_screen, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_t *brand = lv_label_create(s_boot_screen); lv_label_set_text(brand, "TIMETONE"); lv_obj_set_style_text_color(brand, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(brand, &lv_font_montserrat_14, 0); lv_obj_align(brand, LV_ALIGN_TOP_MID, 0, 76);
-    lv_obj_t *title = lv_label_create(s_boot_screen); lv_label_set_text(title, "Getting things ready"); lv_obj_set_style_text_color(title, lv_color_white(), 0); lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0); lv_obj_align(title, LV_ALIGN_CENTER, 0, -18);
-    s_boot_label = lv_label_create(s_boot_screen); lv_label_set_text(s_boot_label, "Starting terminal"); lv_obj_set_style_text_color(s_boot_label, lv_color_hex(0xC8D0C9), 0); lv_obj_set_style_text_font(s_boot_label, &lv_font_montserrat_14, 0); lv_obj_align(s_boot_label, LV_ALIGN_CENTER, 0, 16);
-    lv_obj_t *hint = lv_label_create(s_boot_screen); lv_label_set_text(hint, "Connecting to Wi-Fi and server"); lv_obj_set_style_text_color(hint, lv_color_hex(0xA9B6A9), 0); lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0); lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -64);
+    lv_obj_t *mark = ui_card(s_boot_screen, 91, 58, 58, 58, 0xD8FF62, 0xD8FF62);
+    ui_text(mark, "T", 0x17211B, 21, 20);
+    lv_obj_t *brand = ui_text(s_boot_screen, "TIMETONE", 0xD8FF62, 0, 0); lv_obj_align(brand, LV_ALIGN_TOP_MID, 0, 136);
+    lv_obj_t *title = ui_text(s_boot_screen, "Your office time terminal", 0xF4F7F2, 0, 0); lv_obj_align(title, LV_ALIGN_CENTER, 0, -4);
+    s_boot_label = ui_text(s_boot_screen, "Starting terminal", 0xB9C6BC, 0, 0); lv_obj_align(s_boot_label, LV_ALIGN_CENTER, 0, 28);
+    lv_obj_t *footer = ui_card(s_boot_screen, 30, 260, 180, 32, 0x26352C, 0x405249);
+    ui_text(footer, "Connecting securely", 0x93A39A, 26, 8);
 }
 
 static void build_ota_ui(void)
@@ -437,17 +463,18 @@ static void build_settings_ui(void)
 {
     s_settings_screen = lv_obj_create(lv_screen_active());
     lv_obj_remove_style_all(s_settings_screen); lv_obj_set_size(s_settings_screen, H_RES, V_RES); lv_obj_set_style_bg_color(s_settings_screen, lv_color_hex(0x17211B), 0); lv_obj_set_style_bg_opa(s_settings_screen, LV_OPA_COVER, 0); lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_t *title = lv_label_create(s_settings_screen); lv_label_set_text(title, "TERMINAL SETTINGS"); lv_obj_set_style_text_color(title, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0); lv_obj_set_pos(title, 14, 14);
-    lv_obj_t *subtitle = lv_label_create(s_settings_screen); lv_label_set_text(subtitle, "Connection and terminal controls"); lv_obj_set_style_text_color(subtitle, lv_color_hex(0xA9B6A9), 0); lv_obj_set_style_text_font(subtitle, &lv_font_montserrat_14, 0); lv_obj_set_pos(subtitle, 14, 36);
-    lv_obj_t *connection = lv_obj_create(s_settings_screen); lv_obj_remove_style_all(connection); lv_obj_set_size(connection, 212, 62); lv_obj_set_pos(connection, 14, 60); lv_obj_set_style_bg_color(connection, lv_color_hex(0x26352C), 0); lv_obj_set_style_bg_opa(connection, LV_OPA_COVER, 0); lv_obj_set_style_radius(connection, 12, 0); lv_obj_set_style_border_width(connection, 1, 0); lv_obj_set_style_border_color(connection, lv_color_hex(0x405249), 0);
-    s_ip_label = lv_label_create(connection); lv_obj_set_style_text_color(s_ip_label, lv_color_hex(0xD8FF62), 0); lv_obj_set_style_text_font(s_ip_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_ip_label, 12, 10); lv_label_set_text(s_ip_label, "IP: 0.0.0.0");
-    s_server_label = lv_label_create(connection); lv_obj_set_width(s_server_label, 186); lv_label_set_long_mode(s_server_label, LV_LABEL_LONG_DOT); lv_obj_set_style_text_color(s_server_label, lv_color_hex(0xC8D0C9), 0); lv_obj_set_style_text_font(s_server_label, &lv_font_montserrat_14, 0); lv_obj_set_pos(s_server_label, 12, 34); lv_label_set_text(s_server_label, "Server: not configured");
-    lv_obj_t *section = lv_label_create(s_settings_screen); lv_label_set_text(section, "ACTIONS"); lv_obj_set_style_text_color(section, lv_color_hex(0x788078), 0); lv_obj_set_style_text_font(section, &lv_font_montserrat_14, 0); lv_obj_set_pos(section, 14, 134);
-    settings_button(s_settings_screen, "THEME", 14, 154, 102, 40, settings_theme_event);
-    settings_button(s_settings_screen, "SYNC", 124, 154, 102, 40, settings_sync_event);
-    settings_button(s_settings_screen, "CALIBRATE TOUCH", 14, 204, 212, 38, settings_calibrate_event);
-    lv_obj_t *hint = lv_label_create(s_settings_screen); lv_label_set_text(hint, "Calibration uses 4 corner taps."); lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0); lv_obj_set_style_text_color(hint, lv_color_hex(0xA9B6A9), 0); lv_obj_set_pos(hint, 14, 250);
-    settings_button(s_settings_screen, "BACK", 14, 272, 212, 36, settings_back_event);
+    ui_text(s_settings_screen, "TERMINAL", 0xD8FF62, 14, 16);
+    ui_text(s_settings_screen, "Settings & diagnostics", 0xA9B6A9, 14, 38);
+    lv_obj_t *connection = ui_card(s_settings_screen, 14, 62, 212, 70, 0x26352C, 0x405249);
+    ui_text(connection, "CONNECTION", 0x93A39A, 12, 10);
+    s_ip_label = ui_text(connection, "IP: 0.0.0.0", 0xD8FF62, 12, 30);
+    s_server_label = ui_text(connection, "Server: not configured", 0xC8D0C9, 12, 49); lv_obj_set_width(s_server_label, 184); lv_label_set_long_mode(s_server_label, LV_LABEL_LONG_DOT);
+    ui_text(s_settings_screen, "QUICK ACTIONS", 0x788078, 14, 146);
+    settings_button(s_settings_screen, "THEME", 14, 166, 102, 38, settings_theme_event);
+    settings_button(s_settings_screen, "SYNC NOW", 124, 166, 102, 38, settings_sync_event);
+    settings_button(s_settings_screen, "CALIBRATE TOUCH", 14, 214, 212, 38, settings_calibrate_event);
+    ui_text(s_settings_screen, "Use four corner taps to align touch.", 0xA9B6A9, 14, 260);
+    settings_button(s_settings_screen, "DONE", 14, 280, 212, 30, settings_back_event);
 }
 
 static void build_calibration_ui(void)
