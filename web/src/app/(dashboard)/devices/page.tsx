@@ -2,7 +2,6 @@ import { formatDistanceToNow } from "date-fns";
 import { Cpu, Pencil, Plus, SlidersHorizontal } from "lucide-react";
 import { approveDevice, rejectDevice, renameDevice, requestDeviceSync, requestFirmwareUpdate, saveDeviceSettings } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
-import { UsbFirmwareUpdater } from "@/components/usb-firmware-updater";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getDevices } from "@/lib/db";
@@ -169,7 +168,6 @@ export default async function DevicesPage() {
             </div>
           </div>
         </div>
-          <UsbFirmwareUpdater />
         </div>
       </div>
     </>
