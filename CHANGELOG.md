@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.27] - 2026-09-03
+
+- Re-trigger the initial server setup after Wi-Fi receives an IP address instead of leaving an event-driven terminal waiting indefinitely.
+- Keep the keypad available after a short startup animation while a slow network or TLS connection completes in the background.
+
 ## [0.2.26] - 2026-09-02
 
 - Make terminal server traffic event-driven: no periodic health checks or full configuration downloads after setup; code entries contact the server immediately, and settings refresh only at boot or when manually requested.

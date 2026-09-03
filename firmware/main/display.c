@@ -75,6 +75,7 @@ static void apply_theme_styles(void);
 static void show_main_screen(void);
 static void show_status_screen(void);
 static void refresh_employee_status_list(void);
+static void startup_timeout_timer(lv_timer_t *timer);
 
 static void set_backlight(bool on)
 {
@@ -305,6 +306,21 @@ static void show_main_screen(void)
     if (s_status_screen) lv_obj_add_flag(s_status_screen, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_calibration_screen, LV_OBJ_FLAG_HIDDEN);
+}
+
+// Network association and TLS can legitimately take several seconds on an
+// ESP32. Never make the keypad unavailable while that happens: after the
+// short branded startup moment, let people use the terminal and queue a code
+// even if the server is still coming online.
+static void startup_timeout_timer(lv_timer_t *timer)
+{
+    if (s_starting && !s_ota_visible) {
+        s_starting = false;
+        lv_obj_add_flag(s_boot_screen, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN);
+        set_status("Connecting in background", 0xC47B24);
+    }
+    lv_timer_delete(timer);
 }
 
 static void show_status_screen(void)
@@ -678,6 +694,7 @@ void tk_display_show_startup(void)
     if (!s_boot_screen) return;
     _lock_acquire(&s_lvgl_lock); s_starting = true;
     lv_obj_add_flag(s_main_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_status_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_setup_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_settings_screen, LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_boot_screen, LV_OBJ_FLAG_HIDDEN);
+    lv_timer_create(startup_timeout_timer, 6000, NULL);
     _lock_release(&s_lvgl_lock);
 }
 
