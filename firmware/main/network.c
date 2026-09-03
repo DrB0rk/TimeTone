@@ -17,6 +17,7 @@
 #include "freertos/event_groups.h"
 #include "storage.h"
 #include "display.h"
+#include "api.h"
 
 static const char *TAG = "network";
 static EventGroupHandle_t s_events;
@@ -185,6 +186,12 @@ static void event_handler(void *arg, esp_event_base_t base, int32_t id, void *da
         xEventGroupSetBits(s_events, CONNECTED_BIT);
         s_connect_attempts = 0; s_fallback_active = false;
         tk_display_set_network_state(TK_DISPLAY_CONNECTING);
+        // Sync is event-driven after the v0.2.26 rework: if the api task
+        // already consumed its boot wake before Wi-Fi came up it would block
+        // forever on the semaphore, leaving the terminal stuck on the boot
+        // screen. Re-arm it here so a freshly-online station immediately
+        // heartbeats and fetches config from the server.
+        tk_api_wake();
         start_sntp_once();
         ESP_LOGI(TAG, "connected with IP %s", s_ip);
     }

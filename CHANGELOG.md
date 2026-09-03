@@ -6,6 +6,7 @@ All notable TimeTone releases are documented here. Versions follow
 ## [0.2.26] - 2026-09-02
 
 - Make terminal server traffic event-driven: no periodic health checks or full configuration downloads after setup; code entries contact the server immediately, and settings refresh only at boot or when manually requested.
+- Wake the api task the moment the station acquires an IP so terminals that boot before Wi-Fi is ready do not get stuck on the start-up screen waiting on a one-shot sync that already fired.
 
 ## [0.2.25] - 2026-09-02
 
