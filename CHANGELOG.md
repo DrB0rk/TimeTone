@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.29] - 2026-09-03
+
+- Delay the in-place updater handoff until the install API response has passed through the reverse proxy, preventing a false Cloudflare 502 when the old server stops.
+- Show a useful recovery message if a proxy interrupts an update request.
+
 ## [0.2.28] - 2026-09-03
 
 - Make manual time-entry updates transactional and preserve open entries without applying automatic merge or close rules afterward.

@@ -48,7 +48,17 @@ export async function POST(request: Request) {
     const script = path.join(root, "scripts", docker ? "install-release-docker.sh" : "install-release.sh");
     if (!fsSync.existsSync(script)) return Response.json({ error: `Update helper not found at ${script}.` }, { status: 500 });
     const { spawn } = await import("node:child_process");
-    const child = spawn("sh", [script, root, stage, tag], { detached: true, stdio: "ignore", env: { ...process.env, TIMETONE_UPDATE_ROOT: root, TIMETONE_UPDATE_STATUS: statusPath() } });
+    // The helper stops the current service as part of an in-place update. Let
+    // this response leave Next.js and pass through the reverse proxy first;
+    // otherwise Caddy/Cloudflare sees the origin disappear and reports a 502
+    // even though the update has already started.
+    await writeStatus("queued", `TimeTone ${tag.replace(/^v/, "")} is queued; the server will restart shortly.`, tag.replace(/^v/, ""));
+    const child = spawn("sh", ["-c", "sleep 3; exec \"$@\"", "timetone-update", script, root, stage, tag], {
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env, TIMETONE_UPDATE_ROOT: root, TIMETONE_UPDATE_STATUS: statusPath() },
+    });
+    child.once("error", () => { void writeStatus("error", "Unable to start the update helper.", tag.replace(/^v/, "")); });
     child.unref();
     return Response.json({ ok: true, version: tag.replace(/^v/, ""), message: docker ? "Update downloaded. Docker is rebuilding the server now." : "Update downloaded. The server is building and will restart automatically." });
   } catch (error) {
