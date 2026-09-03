@@ -44,6 +44,7 @@ static const char *TAG = "display";
 
 static _lock_t s_lvgl_lock;
 static lv_display_t *s_display;
+static esp_lcd_touch_handle_t s_touch;
 static lv_obj_t *s_main_screen, *s_status_screen, *s_setup_screen, *s_settings_screen, *s_calibration_screen, *s_boot_screen, *s_ota_screen, *s_header;
 static lv_obj_t *s_clock_label, *s_status_label, *s_pin_label, *s_keypad, *s_count_label, *s_brand_label, *s_ip_label, *s_server_label;
 static lv_obj_t *s_status_dot, *s_boot_label, *s_ota_label;
@@ -187,19 +188,26 @@ static void touch_cb(lv_indev_t *indev, lv_indev_data_t *data)
     }
 }
 
+static bool touch_is_pressed(void)
+{
+    if (!s_touch) return false;
+    uint16_t x[1], y[1];
+    uint8_t count = 0;
+    esp_lcd_touch_read_data(s_touch);
+    return esp_lcd_touch_get_coordinates(s_touch, x, y, NULL, &count, 1) && count > 0;
+}
+
 static void tick_cb(void *argument) { lv_tick_inc(2); }
 
 static void lvgl_task(void *argument)
 {
     while (true) {
-        // The XPT2046 IRQ remains asserted while the panel backlight is off.
-        // Watch it directly so the first physical tap wakes a blank display
-        // even on boards whose coordinate poll pauses during inactivity.
-        if (s_screen_off && gpio_get_level(PIN_TOUCH_IRQ) == 0) {
+        // Do not rely only on the XPT2046 IRQ level here. On some CYD board
+        // revisions it is unreliable after modem sleep; a lightweight touch
+        // controller poll reliably catches the first physical tap.
+        if (s_screen_off && touch_is_pressed()) {
             s_discard_wake_touch = true;
-            s_last_activity_us = esp_timer_get_time();
-            set_screen_off(false);
-            set_screen_sleeping(false);
+            register_activity();
         }
         _lock_acquire(&s_lvgl_lock);
         uint32_t wait = lv_timer_handler();
@@ -609,6 +617,7 @@ esp_err_t tk_display_init(void)
     // left/right orientation on this board revision.
     esp_lcd_touch_config_t touch_config = { .x_max = H_RES, .y_max = V_RES, .rst_gpio_num = -1, .int_gpio_num = PIN_TOUCH_IRQ, .flags = { .swap_xy = 0, .mirror_x = 1, .mirror_y = 0 } };
     esp_lcd_touch_handle_t touch; ESP_ERROR_CHECK(esp_lcd_touch_new_spi_xpt2046(touch_io, &touch_config, &touch));
+    s_touch = touch;
     lv_indev_t *indev = lv_indev_create(); lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); lv_indev_set_display(indev, s_display); lv_indev_set_user_data(indev, touch); lv_indev_set_read_cb(indev, touch_cb);
     const esp_timer_create_args_t tick_args = { .callback = tick_cb, .name = "lvgl_tick" };
     esp_timer_handle_t timer; ESP_ERROR_CHECK(esp_timer_create(&tick_args, &timer)); ESP_ERROR_CHECK(esp_timer_start_periodic(timer, 2000));

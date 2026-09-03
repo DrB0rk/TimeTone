@@ -22,6 +22,7 @@ static SemaphoreHandle_t s_wake;
 static bool s_ota_in_progress;
 static volatile bool s_force_config;
 static volatile bool s_code_requested;
+static volatile bool s_warm_requested;
 static TickType_t s_next_pair_attempt;
 static volatile bool s_clock_request_in_flight;
 // A colour code is the terminal's interactive path. Retain its HTTP client so
@@ -317,6 +318,20 @@ static esp_err_t push_events(void)
     return ESP_OK;
 }
 
+static int warm_clock_connection(void)
+{
+    if (s_clock_connection_warmed) return 200;
+    char response[96];
+    int status = request("/api/device/v1/clock", HTTP_METHOD_POST, "{\"warmup\":true}", response, sizeof(response));
+    // Even a legacy server returning 400 has completed DNS/TCP/TLS and left
+    // the retained client ready for the real colour-code request.
+    if (status > 0) {
+        s_clock_connection_warmed = true;
+        ESP_LOGI(TAG, "clock connection warmed");
+    }
+    return status;
+}
+
 static int heartbeat(void)
 {
     int pending;
@@ -335,16 +350,7 @@ static int heartbeat(void)
         // Warm the dedicated keep-alive client while the terminal is idle.
         // This performs DNS/TCP/TLS before a person reaches the keypad; the
         // response has no timekeeping side effect.
-        if (!s_clock_connection_warmed) {
-            char warmup_response[96];
-            int warmup_status = request("/api/device/v1/clock", HTTP_METHOD_POST, "{\"warmup\":true}", warmup_response, sizeof(warmup_response));
-            // Even an older server returning 400 has completed TLS and left
-            // the keep-alive connection ready for the real request.
-            if (warmup_status > 0) {
-                s_clock_connection_warmed = true;
-                ESP_LOGI(TAG, "clock connection warmed");
-            }
-        }
+        warm_clock_connection();
         return status;
     }
     if (status == 401) {
@@ -368,8 +374,10 @@ static void api_task(void *argument)
         xSemaphoreTake(s_wake, portMAX_DELAY);
         bool refresh_requested = s_force_config;
         bool code_requested = s_code_requested;
+        bool warm_requested = s_warm_requested;
         s_force_config = false;
         s_code_requested = false;
+        s_warm_requested = false;
         if (!tk_network_connected() || !tk_config_get()->configured || tk_display_is_sleeping() || s_clock_request_in_flight) {
             if (refresh_requested) tk_display_set_network_state(TK_DISPLAY_CONNECTING);
             if (code_requested) tk_display_submission_status("Saved - retry when online", 0xC47B24);
@@ -388,6 +396,9 @@ static void api_task(void *argument)
                 tk_display_set_network_state(health_status == 401 ? TK_DISPLAY_CONNECTING : TK_DISPLAY_SYNC_RETRYING);
             }
         }
+        // Waking from low power primes only the retained interactive client.
+        // It does not fetch settings or perform the removed periodic sync.
+        if (warm_requested) warm_clock_connection();
         // A colour-code entry is the only routine server request after setup.
         if (code_requested) {
             esp_err_t code_result = push_code_requests();
@@ -408,5 +419,5 @@ esp_err_t tk_api_start(void)
 }
 
 void tk_api_wake(void) { s_clock_connection_warmed = false; s_force_config = true; if (s_wake) xSemaphoreGive(s_wake); }
-void tk_api_resume(void) { s_clock_connection_warmed = false; }
+void tk_api_resume(void) { s_clock_connection_warmed = false; s_warm_requested = true; if (s_wake) xSemaphoreGive(s_wake); }
 void tk_api_poke(void) { s_code_requested = true; if (s_wake) xSemaphoreGive(s_wake); }

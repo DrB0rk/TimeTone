@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.30] - 2026-09-03
+
+- Restore reliable terminal wake-on-touch by polling the XPT2046 controller while the display is off instead of depending on its low-power IRQ level.
+- Warm the retained interactive server connection after low-power wake without restoring periodic settings syncs.
+
 ## [0.2.29] - 2026-09-03
 
 - Delay the in-place updater handoff until the install API response has passed through the reverse proxy, preventing a false Cloudflare 502 when the old server stops.
