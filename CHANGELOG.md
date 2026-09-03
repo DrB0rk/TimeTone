@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.28] - 2026-09-03
+
+- Make manual time-entry updates transactional and preserve open entries without applying automatic merge or close rules afterward.
+- Show actionable validation errors in the entries page instead of failing the server action.
+
 ## [0.2.27] - 2026-09-03
 
 - Re-trigger the initial server setup after Wi-Fi receives an IP address instead of leaving an event-driven terminal waiting indefinitely.

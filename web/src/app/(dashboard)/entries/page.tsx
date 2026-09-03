@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { durationMinutes, formatDuration, roundDuration } from "@/lib/domain";
 import { getEmployees, getEntryChanges, getFilteredEntries, getSettings } from "@/lib/db";
 
-type Query = { q?: string; employee?: string; status?: string; source?: string; from?: string; to?: string };
+type Query = { q?: string; employee?: string; status?: string; source?: string; from?: string; to?: string; entryError?: string };
 
 export default async function EntriesPage({ searchParams }: { searchParams: Promise<Query> }) {
   const query = await searchParams;
@@ -33,6 +33,11 @@ export default async function EntriesPage({ searchParams }: { searchParams: Prom
         title="Time entries"
         description="Raw clock times stay intact. Rounded duration is calculated separately for transparent reporting."
       />
+      {query.entryError && (
+        <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <span className="font-semibold">Time entry not saved.</span> {query.entryError}
+        </div>
+      )}
       <form className="mb-6 grid gap-3 rounded-2xl border border-black/6 bg-white p-4 shadow-sm shadow-black/[.02] md:grid-cols-[1.35fr_repeat(4,minmax(0,1fr))_auto]">
         <label className="relative"><Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-black/35" /><input name="q" defaultValue={query.q} placeholder="Search employee or note" className="h-9 w-full rounded-lg border border-black/10 bg-white pl-9 pr-3 text-sm" /></label>
         <select name="employee" defaultValue={query.employee || ""} className="h-9 rounded-lg border border-black/10 bg-white px-3 text-sm"><option value="">All employees</option>{allEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select>
@@ -155,6 +160,7 @@ export default async function EntriesPage({ searchParams }: { searchParams: Prom
                                 defaultValue={entry.clock_out ? toDateTimeLocal(entry.clock_out) : ""}
                                 light
                               />
+                              {!entry.clock_out && <p className="-mt-1 text-xs leading-4 text-emerald-700">This entry is open. Leave Clock out empty to keep it open, or set a time to close it.</p>}
                               <div className="space-y-1.5">
                                 <Label htmlFor={`note-${entry.id}`}>Note</Label>
                                 <Input
@@ -193,7 +199,7 @@ export default async function EntriesPage({ searchParams }: { searchParams: Prom
           </div>
           <h2 className="text-xl font-semibold">Manual entry</h2>
           <p className="mt-1 text-xs leading-5 text-white/45">
-            For corrections, remote work, or a missed clock-in.
+            For corrections, remote work, or a missed clock-in. Leave Clock out empty for an open shift.
           </p>
           <form action={addManualEntry} className="mt-6 space-y-4">
             <div className="space-y-2">

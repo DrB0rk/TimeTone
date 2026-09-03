@@ -193,75 +193,79 @@ export async function changePassword(formData: FormData) {
 
 export async function addManualEntry(formData: FormData) {
   await requireAuth();
-  const employeeId = z.string().min(1).parse(formData.get("employee_id"));
-  const clockIn = parseEntryDate(formData.get("clock_in"), "Clock-in");
-  const clockOutValue = String(formData.get("clock_out") || "");
-  const clockOut = clockOutValue
-    ? parseEntryDate(clockOutValue, "Clock-out")
-    : null;
-  const note = z.string().max(200).parse(String(formData.get("note") || ""));
-  if (clockOut && new Date(clockOut) <= new Date(clockIn)) {
-    throw new Error("Clock-out must be after clock-in");
+  try {
+    const employeeId = z.string().min(1).parse(formData.get("employee_id"));
+    const clockIn = parseEntryDate(formData.get("clock_in"), "Clock-in");
+    const clockOutValue = String(formData.get("clock_out") || "");
+    const clockOut = clockOutValue ? parseEntryDate(clockOutValue, "Clock-out") : null;
+    const note = z.string().max(200).parse(String(formData.get("note") || ""));
+    if (clockOut && new Date(clockOut) <= new Date(clockIn)) throw new Error("Clock-out must be after clock-in");
+    const now = new Date().toISOString();
+    const id = crypto.randomUUID();
+    db.transaction(() => {
+      if (!db.prepare("SELECT 1 FROM employees WHERE id = ?").get(employeeId)) throw new Error("Employee not found");
+      if (!clockOut && db.prepare("SELECT 1 FROM time_entries WHERE employee_id = ? AND clock_out IS NULL").get(employeeId)) {
+        throw new Error("This employee already has an open time entry");
+      }
+      db.prepare("INSERT INTO time_entries VALUES (?, ?, ?, ?, 'manual', ?, ?, ?)")
+        .run(id, employeeId, clockIn, clockOut, note || null, now, now);
+      logTimeEntryChange(id, "manual_create", null, { employeeId, clockIn, clockOut, note }, "Manual entry created");
+    })();
+    revalidateTimeEntryViews();
+  } catch (error) {
+    redirectEntryError(error);
   }
-  const now = new Date().toISOString();
-  const id = crypto.randomUUID();
-  db.prepare("INSERT INTO time_entries VALUES (?, ?, ?, ?, 'manual', ?, ?, ?)")
-    .run(
-      id,
-      employeeId,
-      clockIn,
-      clockOut,
-      note || null,
-      now,
-      now,
-    );
-  logTimeEntryChange(id, "manual_create", null, { employeeId, clockIn, clockOut, note }, "Manual entry created");
-  revalidatePath("/entries");
-  revalidatePath("/");
 }
 
 export async function updateTimeEntry(formData: FormData) {
   await requireAuth();
-  const id = z.string().min(1).parse(formData.get("id"));
-  const employeeId = z.string().min(1).parse(formData.get("employee_id"));
-  const clockIn = parseEntryDate(formData.get("clock_in"), "Clock-in");
-  const clockOutValue = String(formData.get("clock_out") || "");
-  const clockOut = clockOutValue
-    ? parseEntryDate(clockOutValue, "Clock-out")
-    : null;
-  const note = z.string().max(200).parse(String(formData.get("note") || ""));
+  try {
+    const id = z.string().min(1).parse(formData.get("id"));
+    const employeeId = z.string().min(1).parse(formData.get("employee_id"));
+    const clockIn = parseEntryDate(formData.get("clock_in"), "Clock-in");
+    const clockOutValue = String(formData.get("clock_out") || "");
+    const clockOut = clockOutValue ? parseEntryDate(clockOutValue, "Clock-out") : null;
+    const note = z.string().max(200).parse(String(formData.get("note") || ""));
+    if (clockOut && new Date(clockOut) <= new Date(clockIn)) throw new Error("Clock-out must be after clock-in");
 
-  if (!db.prepare("SELECT id FROM time_entries WHERE id = ?").get(id)) {
-    throw new Error("Time entry not found");
+    db.transaction(() => {
+      const before = db.prepare("SELECT * FROM time_entries WHERE id = ?").get(id);
+      if (!before) throw new Error("Time entry not found");
+      if (!db.prepare("SELECT 1 FROM employees WHERE id = ?").get(employeeId)) throw new Error("Employee not found");
+      const otherOpen = db.prepare(
+        "SELECT id FROM time_entries WHERE employee_id = ? AND clock_out IS NULL AND id != ?",
+      ).get(employeeId, id);
+      if (!clockOut && otherOpen) throw new Error("This employee already has an open time entry");
+      db.prepare(
+        "UPDATE time_entries SET employee_id = ?, clock_in = ?, clock_out = ?, note = ?, updated_at = ? WHERE id = ?",
+      ).run(employeeId, clockIn, clockOut, note || null, new Date().toISOString(), id);
+      logTimeEntryChange(
+        id,
+        "manual_edit",
+        before,
+        { ...(before as Record<string, unknown>), employee_id: employeeId, clock_in: clockIn, clock_out: clockOut, note: note || null },
+        clockOut ? "Manual correction from dashboard" : "Manual correction; entry remains open",
+      );
+    })();
+    // A direct correction is authoritative. Do not run automatic merge/close
+    // rules here: they can change an open entry immediately after it is saved.
+    revalidateTimeEntryViews();
+  } catch (error) {
+    redirectEntryError(error);
   }
-  if (!db.prepare("SELECT id FROM employees WHERE id = ?").get(employeeId)) {
-    throw new Error("Employee not found");
-  }
-  if (clockOut && new Date(clockOut) <= new Date(clockIn)) {
-    throw new Error("Clock-out must be after clock-in");
-  }
-  const otherOpen = db.prepare(
-    "SELECT id FROM time_entries WHERE employee_id = ? AND clock_out IS NULL AND id != ?",
-  ).get(employeeId, id);
-  if (!clockOut && otherOpen) {
-    throw new Error("This employee already has an open time entry");
-  }
+}
 
-  const before = db.prepare("SELECT * FROM time_entries WHERE id = ?").get(id);
-  db.prepare(
-    "UPDATE time_entries SET employee_id = ?, clock_in = ?, clock_out = ?, note = ?, updated_at = ? WHERE id = ?",
-  ).run(employeeId, clockIn, clockOut, note || null, new Date().toISOString(), id);
-  logTimeEntryChange(
-    id,
-    "manual_edit",
-    before,
-    { ...(before as Record<string, unknown>), employee_id: employeeId, clock_in: clockIn, clock_out: clockOut, note: note || null },
-    "Manual correction from dashboard",
-  );
-  runTimeMaintenance();
+function revalidateTimeEntryViews() {
   revalidatePath("/entries");
   revalidatePath("/");
   revalidatePath("/reports");
+}
+
+function redirectEntryError(error: unknown): never {
+  // Next redirects are implemented as a thrown sentinel and must pass through.
+  if (typeof error === "object" && error !== null && "digest" in error && String(error.digest).startsWith("NEXT_REDIRECT")) throw error;
+  const message = error instanceof Error && error.message ? error.message : "Unable to save this time entry";
+  redirect(`/entries?entryError=${encodeURIComponent(message)}`);
 }
 
 export async function deleteTimeEntry(formData: FormData) {
