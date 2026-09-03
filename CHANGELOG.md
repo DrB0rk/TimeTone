@@ -3,6 +3,10 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.31] - 2026-09-03
+
+- Calculate report averages from days with actual attendance only, using merged office-occupation intervals so overlapping employee sessions are counted once.
+
 ## [0.2.30] - 2026-09-03
 
 - Restore reliable terminal wake-on-touch by polling the XPT2046 controller while the display is off instead of depending on its low-power IRQ level.
