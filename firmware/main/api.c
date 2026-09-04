@@ -36,6 +36,14 @@ static bool s_clock_connection_warmed;
 typedef struct { char *data; size_t length; size_t capacity; } response_buffer_t;
 static void ota_task(void *argument);
 
+static void discard_clock_client(void)
+{
+    if (s_clock_client) esp_http_client_cleanup(s_clock_client);
+    s_clock_client = NULL;
+    s_clock_client_server[0] = 0;
+    s_clock_connection_warmed = false;
+}
+
 static esp_err_t http_event(esp_http_client_event_t *event)
 {
     response_buffer_t *buffer = event->user_data;
@@ -79,10 +87,7 @@ static int request(const char *path, esp_http_client_method_t method, const char
     // Settings may change the server URL from the terminal web UI. Dispose of
     // the retained interactive connection only in that case.
     if (s_clock_client && strcmp(s_clock_client_server, config->server_url) != 0) {
-        esp_http_client_cleanup(s_clock_client);
-        s_clock_client = NULL;
-        s_clock_client_server[0] = 0;
-        s_clock_connection_warmed = false;
+        discard_clock_client();
     }
     esp_http_client_handle_t client = is_clock ? s_clock_client : NULL;
     if (!client) {
@@ -419,5 +424,15 @@ esp_err_t tk_api_start(void)
 }
 
 void tk_api_wake(void) { s_clock_connection_warmed = false; s_force_config = true; if (s_wake) xSemaphoreGive(s_wake); }
-void tk_api_resume(void) { s_clock_connection_warmed = false; s_warm_requested = true; if (s_wake) xSemaphoreGive(s_wake); }
+void tk_api_resume(void)
+{
+    // A proxy commonly drops an idle HTTP keep-alive while the terminal is in
+    // low power. Keeping that socket makes the first colour code after wake
+    // wait for a TCP timeout. Start a clean TLS connection during wake-up,
+    // before anyone reaches the keypad, and independently validate Wi-Fi.
+    tk_network_resume();
+    if (!s_clock_request_in_flight) discard_clock_client();
+    s_warm_requested = true;
+    if (s_wake) xSemaphoreGive(s_wake);
+}
 void tk_api_poke(void) { s_code_requested = true; if (s_wake) xSemaphoreGive(s_wake); }

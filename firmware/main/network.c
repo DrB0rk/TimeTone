@@ -257,3 +257,29 @@ void tk_network_set_low_power(bool enabled)
     // while the terminal display is idle.
     esp_wifi_set_ps(enabled ? WIFI_PS_MAX_MODEM : WIFI_PS_NONE);
 }
+
+void tk_network_resume(void)
+{
+    const tk_config_t *config = tk_config_get();
+    if (!config->configured) return;
+
+    // MAX_MODEM is useful while the terminal is idle, but after a long sleep
+    // an AP may have discarded the station without generating a prompt event.
+    // Restore full radio power first, then verify association rather than
+    // trusting an old DHCP/IP event bit.
+    esp_err_t power_err = esp_wifi_set_ps(WIFI_PS_NONE);
+    if (power_err != ESP_OK) ESP_LOGW(TAG, "could not restore Wi-Fi power: %s", esp_err_to_name(power_err));
+
+    wifi_ap_record_t access_point;
+    bool association_lost = esp_wifi_sta_get_ap_info(&access_point) != ESP_OK;
+    bool had_ip = tk_network_connected();
+    if (!had_ip || association_lost) {
+        xEventGroupClearBits(s_events, CONNECTED_BIT);
+        ESP_LOGW(TAG, "wake network check: %s; reconnecting station", association_lost ? "association lost" : "no IP");
+        // Disconnecting an orphaned station makes the normal event handler
+        // perform its bounded recovery sequence. A disconnected station can
+        // simply be connected directly.
+        if (association_lost && had_ip) esp_wifi_disconnect();
+        else esp_wifi_connect();
+    }
+}

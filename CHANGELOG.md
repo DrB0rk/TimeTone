@@ -3,6 +3,11 @@
 All notable TimeTone releases are documented here. Versions follow
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [0.2.32] - 2026-09-04
+
+- Make terminal wake-up resilient after long idle periods: restore full Wi-Fi radio power, verify the current access-point association, and trigger the normal reconnect flow when it has expired.
+- Drop idle retained HTTPS connections on wake and establish a fresh connection before the next colour code, avoiding a first-entry timeout without reintroducing periodic server syncs.
+
 ## [0.2.31] - 2026-09-03
 
 - Calculate report averages from days with actual attendance only, using merged office-occupation intervals so overlapping employee sessions are counted once.
